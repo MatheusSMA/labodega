@@ -1,0 +1,8 @@
+{
+  // Site estático La Bodega — servido como Worker de assets estáticos (sem backend).
+  "name": "labodega",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./public"
+  }
+}
