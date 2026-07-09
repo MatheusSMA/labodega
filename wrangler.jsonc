@@ -1,8 +1,16 @@
 {
-  // Site estático La Bodega — servido como Worker de assets estáticos (sem backend).
+  // La Bodega — site estático (public/) + Worker com painel/API (/painel, /api).
   "name": "labodega",
+  "main": "src/worker.js",
   "compatibility_date": "2025-01-01",
   "assets": {
-    "directory": "./public"
-  }
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    { "binding": "CMS", "id": "1925cac54aef41298a61ad13700e7007" }
+  ],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.html"], "fallthrough": true }
+  ]
 }

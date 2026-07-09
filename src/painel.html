@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel — La Bodega</title>
+<style>
+  * { box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  body { margin:0; background:#0f1115; color:#e8eaed; }
+  .top { position:sticky; top:0; z-index:10; background:#141821; border-bottom:1px solid #272b36; padding:14px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  .top h1 { font-size:17px; margin:0; }
+  .tabs { display:flex; gap:6px; margin-left:auto; }
+  .tab { background:#1b1e26; border:1px solid #272b36; color:#9aa0ab; padding:8px 16px; border-radius:9px; cursor:pointer; font-size:14px; }
+  .tab.active { background:#25D366; color:#06210f; border-color:#25D366; font-weight:700; }
+  .wrap { max-width:820px; margin:0 auto; padding:20px; }
+  .card { background:#1b1e26; border:1px solid #272b36; border-radius:16px; padding:20px; margin-bottom:18px; }
+  .card h2 { font-size:14px; margin:0 0 14px; color:#cfd3da; text-transform:uppercase; letter-spacing:.5px; }
+  label.field { display:block; margin-bottom:12px; font-size:13px; color:#9aa0ab; }
+  label.field input, label.field textarea { width:100%; margin-top:5px; }
+  input, textarea, select { background:#0f1115; border:1px solid #313644; color:#fff; border-radius:9px; padding:9px 11px; font-size:14px; }
+  input:focus, textarea:focus { outline:none; border-color:#25D366; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .chk { display:inline-flex; align-items:center; gap:7px; font-size:14px; margin:4px 14px 4px 0; cursor:pointer; }
+  .hrow { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .hrow .chk { width:130px; }
+  .crow, .frow { display:flex; gap:8px; margin-bottom:8px; }
+  .crow input.c_cat { width:120px; } .crow input.c_preco { width:90px; }
+  .crow input, .frow input { flex:1; min-width:0; }
+  .del { background:#2a2f3a; border:none; color:#ff6b6b; border-radius:8px; width:38px; cursor:pointer; }
+  .addbtn { background:#222733; border:1px dashed #3a4150; color:#9aa0ab; border-radius:9px; padding:9px; width:100%; cursor:pointer; font-size:13px; }
+  .bar { position:sticky; bottom:0; background:#0f1115cc; backdrop-filter:blur(6px); padding:16px 0; display:flex; align-items:center; gap:16px; }
+  .save { background:#25D366; color:#06210f; border:none; font-weight:700; font-size:16px; padding:13px 26px; border-radius:11px; cursor:pointer; }
+  #status { font-size:14px; }
+  small.dim { color:#6b717c; }
+  .hidden { display:none; }
+  .soon { text-align:center; color:#9aa0ab; padding:60px 20px; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>🍽️ Painel — La Bodega</h1>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('bot')" id="tab-bot">Bot</button>
+    <button class="tab" onclick="showTab('site')" id="tab-site">Site</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- ================= ABA BOT ================= -->
+  <div id="pane-bot">
+    <div class="card">
+      <h2>Dados gerais</h2>
+      <label class="field">Nome<input id="nome"></label>
+      <div class="grid2">
+        <label class="field">Telefone<input id="telefone"></label>
+        <label class="field">Endereço<input id="endereco"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Horário de funcionamento</h2>
+      <div id="horarios"></div>
+      <small class="dim">Desmarque o dia para indicar que está fechado.</small>
+    </div>
+
+    <div class="card">
+      <h2>Reservas</h2>
+      <label class="chk"><input type="checkbox" id="rv_aceita"> Aceita reservas</label>
+      <div class="grid2" style="margin-top:10px;">
+        <label class="field">Máximo de pessoas<input id="rv_max" type="number"></label>
+        <label class="field">Antecedência<input id="rv_ant"></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Delivery</h2>
+      <label class="chk"><input type="checkbox" id="dl_faz"> Faz entrega</label>
+      <div class="grid2" style="margin-top:10px;">
+        <label class="field">Bairros<input id="dl_bairros"></label>
+        <label class="field">Taxa<input id="dl_taxa"></label>
+      </div>
+      <label class="field">Tempo estimado<input id="dl_tempo"></label>
+    </div>
+
+    <div class="card">
+      <h2>Formas de pagamento</h2>
+      <div id="pagamento"></div>
+    </div>
+
+    <div class="card">
+      <h2>Cardápio</h2>
+      <div id="cardapio"></div>
+      <button type="button" class="addbtn" onclick="addCard()">+ Adicionar item</button>
+    </div>
+
+    <div class="card">
+      <h2>Perguntas frequentes (FAQ)</h2>
+      <div id="faq"></div>
+      <button type="button" class="addbtn" onclick="addFaq()">+ Adicionar pergunta</button>
+    </div>
+  </div>
+
+  <!-- ================= ABA SITE ================= -->
+  <div id="pane-site" class="hidden">
+    <div class="card soon">
+      🚧 <b>Em construção</b><br><br>
+      Aqui você vai editar o site: textos, preços, cardápio e imagens do carrossel.<br>
+      Estamos montando essa aba — em breve!
+    </div>
+  </div>
+
+  <div class="bar">
+    <button class="save" onclick="salvar()">💾 Salvar</button>
+    <span id="status"></span>
+  </div>
+</div>
+
+<script>
+const API = "/api/config/labodega";
+const DIAS = [["seg","Segunda"],["ter","Terça"],["qua","Quarta"],["qui","Quinta"],["sex","Sexta"],["sab","Sábado"],["dom","Domingo"]];
+const PAGOS = ["Pix","Cartão de crédito","Cartão de débito","Dinheiro","Vale-refeição"];
+const el = id => document.getElementById(id);
+const esc = s => (s||"").replace(/"/g,"&quot;");
+
+function showTab(t) {
+  el("pane-bot").classList.toggle("hidden", t!=="bot");
+  el("pane-site").classList.toggle("hidden", t!=="site");
+  el("tab-bot").classList.toggle("active", t==="bot");
+  el("tab-site").classList.toggle("active", t==="site");
+}
+
+function getKey() {
+  let k = localStorage.getItem("panelKey");
+  if (!k) { k = prompt("Digite a CHAVE do painel (a que você configurou na Cloudflare):") || ""; if (k) localStorage.setItem("panelKey", k); }
+  return k;
+}
+
+function fillHorarios(h) {
+  el("horarios").innerHTML = "";
+  DIAS.forEach(([k,label]) => {
+    const d = (h && h[k]) || {abre:false, ini:"", fim:""};
+    const row = document.createElement("div"); row.className = "hrow";
+    row.innerHTML = `<label class="chk"><input type="checkbox" class="abre" data-d="${k}" ${d.abre?"checked":""}> ${label}</label>
+      <input type="time" class="ini" data-d="${k}" value="${d.ini||""}"> <span style="color:#6b717c">às</span>
+      <input type="time" class="fim" data-d="${k}" value="${d.fim||""}">`;
+    el("horarios").appendChild(row);
+  });
+}
+function fillPagamento(sel) {
+  el("pagamento").innerHTML = "";
+  const set = new Set(sel||[]);
+  PAGOS.forEach(p => {
+    const lab = document.createElement("label"); lab.className = "chk";
+    lab.innerHTML = `<input type="checkbox" class="pg" value="${p}" ${set.has(p)?"checked":""}> ${p}`;
+    el("pagamento").appendChild(lab);
+  });
+}
+function addCard(it={categoria:"",nome:"",preco:"",desc:"",tags:""}) {
+  const row = document.createElement("div"); row.className = "crow";
+  row.innerHTML = `<input class="c_cat" placeholder="Categoria" value="${esc(it.categoria)}">
+    <input class="c_nome" placeholder="Prato" value="${esc(it.nome)}">
+    <input class="c_preco" type="number" step="0.01" placeholder="Preço" value="${it.preco!==undefined?it.preco:""}">
+    <input class="c_desc" placeholder="Descrição" value="${esc(it.desc)}">
+    <input class="c_tags" placeholder="Tags" value="${esc(it.tags)}">
+    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
+  el("cardapio").appendChild(row);
+}
+function addFaq(q={p:"",r:""}) {
+  const row = document.createElement("div"); row.className = "frow";
+  row.innerHTML = `<input class="f_p" placeholder="Pergunta" value="${esc(q.p)}">
+    <input class="f_r" placeholder="Resposta" value="${esc(q.r)}">
+    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
+  el("faq").appendChild(row);
+}
+
+function fillForm(b) {
+  el("nome").value = b.nome||""; el("telefone").value = b.telefone||""; el("endereco").value = b.endereco||"";
+  fillHorarios(b.horarios);
+  const rv = b.reservas||{}; el("rv_aceita").checked = !!rv.aceita; el("rv_max").value = rv.max_pessoas||""; el("rv_ant").value = rv.antecedencia||"";
+  const dl = b.delivery||{}; el("dl_faz").checked = !!dl.faz; el("dl_bairros").value = dl.bairros||""; el("dl_taxa").value = dl.taxa||""; el("dl_tempo").value = dl.tempo||"";
+  fillPagamento(b.pagamento);
+  el("cardapio").innerHTML = ""; (b.cardapio||[]).forEach(addCard);
+  el("faq").innerHTML = ""; (b.faq||[]).forEach(addFaq);
+}
+
+function collectBot() {
+  const horarios = {};
+  DIAS.forEach(([k]) => { horarios[k] = {
+    abre: document.querySelector(`.abre[data-d="${k}"]`).checked,
+    ini: document.querySelector(`.ini[data-d="${k}"]`).value,
+    fim: document.querySelector(`.fim[data-d="${k}"]`).value }; });
+  return {
+    slug: "labodega",
+    nome: el("nome").value.trim(), telefone: el("telefone").value.trim(), endereco: el("endereco").value.trim(),
+    horarios,
+    reservas: { aceita: el("rv_aceita").checked, max_pessoas: parseInt(el("rv_max").value||"0")||0, antecedencia: el("rv_ant").value.trim() },
+    delivery: { faz: el("dl_faz").checked, bairros: el("dl_bairros").value.trim(), taxa: el("dl_taxa").value.trim(), tempo: el("dl_tempo").value.trim() },
+    pagamento: [...document.querySelectorAll(".pg:checked")].map(x=>x.value),
+    cardapio: [...document.querySelectorAll(".crow")].map(r=>({
+      categoria: r.querySelector(".c_cat").value.trim(), nome: r.querySelector(".c_nome").value.trim(),
+      preco: parseFloat(r.querySelector(".c_preco").value||"0")||0,
+      desc: r.querySelector(".c_desc").value.trim(), tags: r.querySelector(".c_tags").value.trim() })).filter(it=>it.nome),
+    faq: [...document.querySelectorAll(".frow")].map(r=>({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q=>q.p),
+  };
+}
+
+async function salvar() {
+  const st = el("status"); st.textContent = "Salvando..."; st.style.color = "#9aa0ab";
+  const key = getKey();
+  if (!key) { st.textContent = "Precisa da chave pra salvar."; st.style.color = "#ffb454"; return; }
+  try {
+    const res = await fetch(API, { method:"POST", headers:{"content-type":"application/json","x-panel-key":key}, body: JSON.stringify({ bot: collectBot() }) });
+    const j = await res.json();
+    if (j.ok) { st.textContent = "✅ Salvo! O bot já usa essas informações."; st.style.color = "#25D366"; }
+    else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; if (res.status===401) localStorage.removeItem("panelKey"); }
+  } catch (e) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; }
+}
+
+// carregar
+(async () => {
+  try {
+    const b = await (await fetch(API + "/bot")).json();
+    fillForm(b);
+  } catch (e) { el("status").textContent = "Erro ao carregar: " + e; }
+})();
+</script>
+</body>
+</html>

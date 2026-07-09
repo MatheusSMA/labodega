@@ -1,0 +1,28 @@
+{
+  "slug": "labodega",
+  "nome": "La Bodega",
+  "telefone": "(24) 2017-9899",
+  "endereco": "Pátio Petrópolis, na Área de alimentação",
+  "horarios": {
+    "seg": { "abre": true, "ini": "10:00", "fim": "22:00" },
+    "ter": { "abre": true, "ini": "10:00", "fim": "22:00" },
+    "qua": { "abre": true, "ini": "10:00", "fim": "22:00" },
+    "qui": { "abre": true, "ini": "10:00", "fim": "22:00" },
+    "sex": { "abre": true, "ini": "10:00", "fim": "22:00" },
+    "sab": { "abre": true, "ini": "10:00", "fim": "22:00" },
+    "dom": { "abre": true, "ini": "10:00", "fim": "21:00" }
+  },
+  "reservas": { "aceita": false, "max_pessoas": 12, "antecedencia": "até 2 horas antes" },
+  "delivery": { "faz": false, "bairros": "", "taxa": "", "tempo": "" },
+  "pagamento": ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"],
+  "cardapio": [
+    { "categoria": "Executivos", "nome": "Frango com Caesar", "preco": 29.90, "desc": "", "tags": "" },
+    { "categoria": "Executivos", "nome": "Strogonoff de frango", "preco": 34.90, "desc": "", "tags": "" },
+    { "categoria": "Pratos", "nome": "Picadinho carioca", "preco": 59.90, "desc": "Carne angus, arroz, feijão, banana à milanesa e ovo pochê", "tags": "" },
+    { "categoria": "Pratos", "nome": "Espaguete de legumes", "preco": 49.90, "desc": "Refogado no azeite", "tags": "vegano" }
+  ],
+  "faq": [
+    { "p": "Tem estacionamento?", "r": "Sim, o Pátio Petrópolis tem estacionamento no local." }
+  ],
+  "cardapio_pdf": ""
+}
