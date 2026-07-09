@@ -102,10 +102,16 @@
 
   <!-- ================= ABA SITE ================= -->
   <div id="pane-site" class="hidden">
-    <div class="card soon">
-      🚧 <b>Em construção</b><br><br>
-      Aqui você vai editar o site: textos, preços, cardápio e imagens do carrossel.<br>
-      Estamos montando essa aba — em breve!
+    <div class="card">
+      <h2>Disponibilidade do site</h2>
+      <label class="chk"><input type="checkbox" id="site_embreve"> Ativar modo <b>“Em breve”</b> (esconde o site)</label>
+      <small class="dim" style="display:block;margin-top:8px">Com isso ligado, quem acessar <b>labodegapetropolis.com.br</b> vê só a logo e a mensagem abaixo — o site completo fica escondido. Desligue para o site voltar ao normal.</small>
+      <label class="field" style="margin-top:14px">Mensagem do “Em breve”
+        <input id="site_msg" placeholder="Ex: Estamos preparando algo especial. Volte logo!"></label>
+    </div>
+    <div class="card soon" style="padding:34px 20px">
+      ✏️ <b>Edição do conteúdo do site</b> (textos, preços, imagens do carrossel)<br><br>
+      <small class="dim">Essa parte é a próxima fase — em breve você edita tudo por aqui.</small>
     </div>
   </div>
 
@@ -183,6 +189,15 @@ function fillForm(b) {
   el("faq").innerHTML = ""; (b.faq||[]).forEach(addFaq);
 }
 
+function fillSite(s) {
+  s = s || {};
+  el("site_embreve").checked = !!s.emBreve;
+  el("site_msg").value = s.msg || "";
+}
+function collectSite() {
+  return { emBreve: el("site_embreve").checked, msg: el("site_msg").value.trim() };
+}
+
 function collectBot() {
   const horarios = {};
   DIAS.forEach(([k]) => { horarios[k] = {
@@ -209,7 +224,7 @@ async function salvar() {
   const key = getKey();
   if (!key) { st.textContent = "Precisa da chave pra salvar."; st.style.color = "#ffb454"; return; }
   try {
-    const res = await fetch(API, { method:"POST", headers:{"content-type":"application/json","x-panel-key":key}, body: JSON.stringify({ bot: collectBot() }) });
+    const res = await fetch(API, { method:"POST", headers:{"content-type":"application/json","x-panel-key":key}, body: JSON.stringify({ bot: collectBot(), site: collectSite() }) });
     const j = await res.json();
     if (j.ok) { st.textContent = "✅ Salvo! O bot já usa essas informações."; st.style.color = "#25D366"; }
     else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; if (res.status===401) localStorage.removeItem("panelKey"); }
@@ -219,8 +234,9 @@ async function salvar() {
 // carregar
 (async () => {
   try {
-    const b = await (await fetch(API + "/bot")).json();
-    fillForm(b);
+    const cfg = await (await fetch(API)).json();
+    fillForm(cfg.bot || {});
+    fillSite(cfg.site || {});
   } catch (e) { el("status").textContent = "Erro ao carregar: " + e; }
 })();
 </script>
