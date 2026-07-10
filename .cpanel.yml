@@ -1,0 +1,7 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/labodegapetropol/public_html
+    - /bin/mkdir -p $DEPLOYPATH/img
+    - /bin/cp -f public/index.html $DEPLOYPATH/
+    - /bin/cp -f public/img/* $DEPLOYPATH/img/
