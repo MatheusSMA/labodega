@@ -4,6 +4,8 @@ Roda em labodegapetropolis.com.br/painel. Edita o BOT e o SITE:
 - Dados em data/labodega.json (não sobrescrito pelo deploy do Git).
 - Ao salvar, regenera o index.html a partir de site_template.html e grava
   em ~/public_html (o site continua 100% estático e rápido).
+- /painel/editor = editor VISUAL: o site renderizado em modo edição
+  (clica no texto pra editar, clica na foto pra trocar, salva e publica).
 - Upload de imagens grava em ~/public_html/img/ com nome único por slot.
 - O bot lê a config em /painel/api/config/bot.
 
@@ -125,6 +127,35 @@ DEFAULT_SITE = {
     "img": {"logo": "/img/logo.png", "hero": "/img/hero-bg.jpg", "drinks": "/img/drinks.jpg"},
 }
 
+# Campos de texto editáveis no editor visual: marcador -> (caminho, aceita html leve)
+EDIT_TEXT = {
+    "HERO_TITULO": ("site.hero.titulo", True),
+    "HERO_SUB": ("site.hero.sub", False),
+    "CASA_QUOTE": ("site.casa.quote", True),
+    "CASA1_T": ("site.casa.cards.0.t", False),
+    "CASA1_D": ("site.casa.cards.0.d", False),
+    "CASA2_T": ("site.casa.cards.1.t", False),
+    "CASA2_D": ("site.casa.cards.1.d", False),
+    "CASA3_T": ("site.casa.cards.2.t", False),
+    "CASA3_D": ("site.casa.cards.2.d", False),
+    "MENU_TITULO": ("site.menu.titulo", False),
+    "MENU_DESC": ("site.menu.desc", False),
+    "COMBO_TITULO": ("site.combo.titulo", False),
+    "COMBO_PRECO": ("site.combo.preco", False),
+    "COMBO_SUB": ("site.combo.sub", False),
+    "COMBO_NOTA": ("site.combo.nota", False),
+    "DRINK_TITULO": ("site.drink.titulo", False),
+    "DRINK_NOME": ("site.drink.nome", True),
+    "DRINK_DESC": ("site.drink.desc", False),
+    "ENDERECO_BR": ("site.visita.endereco", True),
+    "ENDERECO_OBS": ("site.visita.obs_endereco", False),
+    "HORARIO_OBS": ("site.visita.obs_horario", False),
+    "TEL": ("site.contato.tel", False),
+    "EMAIL": ("site.contato.email", False),
+    "INSTA": ("site.contato.insta", False),
+    "NOME": ("bot.nome", False),
+}
+
 
 def _merge(base, extra):
     """Merge raso por seção: extra sobrepõe base, preservando chaves novas do default."""
@@ -181,35 +212,42 @@ def _esc(s):
     return str(s or "")
 
 
-def _menu_cols(cardapio, subs):
+def _menu_cols(cardapio, subs, edit=False):
     grupos, ordem = {}, []
-    for it in cardapio or []:
+    for idx, it in enumerate(cardapio or []):
         cat = it.get("categoria") or "Outros"
         if cat not in grupos:
             grupos[cat] = []
             ordem.append(cat)
-        grupos[cat].append(it)
+        grupos[cat].append((idx, it))
     parts = ['<div class="menu-cols">']
     for cat in ordem:
         parts.append('      <div class="menu-group reveal">')
         parts.append(f"        <h3>{_esc(cat)}</h3>")
         sub = (subs or {}).get(cat, "")
         if sub:
-            parts.append(f'        <p class="gh-sub">{_esc(sub)}</p>')
-        for it in grupos[cat]:
+            s = f'<span data-key="site.menu.subs.{_esc(cat)}">{_esc(sub)}</span>' if edit else _esc(sub)
+            parts.append(f'        <p class="gh-sub">{s}</p>')
+        for idx, it in grupos[cat]:
             nome = _esc(it.get("nome"))
+            if edit:
+                nome = f'<span data-key="bot.cardapio.{idx}.nome">{nome}</span>'
             tags = (it.get("tags") or "").lower()
             if "vegano" in tags:
                 nome += ' <span class="veg">Vegano</span>'
             elif "vegetariano" in tags:
                 nome += ' <span class="veg">Vegetariano</span>'
+            preco = _preco(it.get("preco", 0))
+            if edit:
+                preco = f'<span data-key="bot.cardapio.{idx}.preco">{preco}</span>'
             desc = _esc(it.get("desc"))
             linha = (f'        <div class="item"><div class="item-row">'
                      f'<span class="item-name">{nome}</span>'
                      f'<span class="item-lead"></span>'
-                     f'<span class="item-price">{_preco(it.get("preco", 0))}</span></div>')
+                     f'<span class="item-price">{preco}</span></div>')
             if desc:
-                linha += f'<p class="item-desc">{desc}</p>'
+                d = f'<span data-key="bot.cardapio.{idx}.desc">{desc}</span>' if edit else desc
+                linha += f'<p class="item-desc">{d}</p>'
             linha += "</div>"
             parts.append(linha)
         parts.append("      </div>")
@@ -217,16 +255,29 @@ def _menu_cols(cardapio, subs):
     return "\n".join(parts)
 
 
-def _ul(linhas):
-    itens = "".join(f"<li>{_esc(l.strip())}</li>" for l in (linhas or "").splitlines() if l.strip())
-    return f"<ul>{itens}</ul>"
+def _ul(linhas, path=None):
+    itens = []
+    for i, l in enumerate((linhas or "").splitlines()):
+        if not l.strip():
+            continue
+        t = _esc(l.strip())
+        if path:
+            t = f'<span data-key="{path}.{i}">{t}</span>'
+        itens.append(f"<li>{t}</li>")
+    return "<ul>" + "".join(itens) + "</ul>"
 
 
-def _vrows(rows):
-    return "".join(
-        f'<div class="vrow"><span>{_esc(r[0])}</span><span>{_esc(r[1])}</span></div>'
-        for r in (rows or []) if r and (r[0] or r[1])
-    )
+def _vrows(rows, edit=False):
+    out = []
+    for i, r in enumerate(rows or []):
+        if not r or not (r[0] or r[1]):
+            continue
+        a, b = _esc(r[0]), _esc(r[1])
+        if edit:
+            a = f'<span data-key="site.visita.horarios.{i}.0">{a}</span>'
+            b = f'<span data-key="site.visita.horarios.{i}.1">{b}</span>'
+        out.append(f'<div class="vrow"><span>{a}</span><span>{b}</span></div>')
+    return "".join(out)
 
 
 def _tel_link(tel):
@@ -236,7 +287,7 @@ def _tel_link(tel):
     return "+" + dig if dig else ""
 
 
-def render_site(cfg):
+def render_site(cfg, edit=False):
     site = _merge(DEFAULT_SITE, cfg.get("site"))
     bot = _merge(DEFAULT_BOT, cfg.get("bot"))
     with open(TEMPLATE, encoding="utf-8") as f:
@@ -260,11 +311,11 @@ def render_site(cfg):
         "COMBO_TITULO": site["combo"]["titulo"],
         "COMBO_PRECO": site["combo"]["preco"],
         "COMBO_SUB": site["combo"]["sub"],
-        "COMBO_UL1": _ul(site["combo"]["entradas"]),
-        "COMBO_UL2": _ul(site["combo"]["principal"]),
-        "COMBO_UL3": _ul(site["combo"]["sobremesas"]),
+        "COMBO_UL1": _ul(site["combo"]["entradas"], "site.combo.entradas" if edit else None),
+        "COMBO_UL2": _ul(site["combo"]["principal"], "site.combo.principal" if edit else None),
+        "COMBO_UL3": _ul(site["combo"]["sobremesas"], "site.combo.sobremesas" if edit else None),
         "COMBO_NOTA": site["combo"]["nota"],
-        "MENU_COLS": _menu_cols(bot.get("cardapio"), site["menu"].get("subs")),
+        "MENU_COLS": _menu_cols(bot.get("cardapio"), site["menu"].get("subs"), edit),
         "DRINK_TITULO": site["drink"]["titulo"],
         "DRINK_NOME": site["drink"]["nome"],
         "DRINK_DESC": site["drink"]["desc"],
@@ -272,7 +323,7 @@ def render_site(cfg):
         "DRINK_CENTS": ("," + d_cents.strip()) if d_cents.strip() else ",00",
         "ENDERECO_BR": "<br>".join(endereco_lines),
         "ENDERECO_OBS": site["visita"]["obs_endereco"],
-        "VISITA_HORARIOS": _vrows(site["visita"].get("horarios")),
+        "VISITA_HORARIOS": _vrows(site["visita"].get("horarios"), edit),
         "HORARIO_OBS": site["visita"]["obs_horario"],
         "TEL": site["contato"]["tel"],
         "TEL_LINK": _tel_link(site["contato"]["tel"]),
@@ -285,8 +336,28 @@ def render_site(cfg):
         c = cards[i] if i < len(cards) else {"t": "", "d": ""}
         valores[f"CASA{i+1}_T"] = c.get("t", "")
         valores[f"CASA{i+1}_D"] = c.get("d", "")
+
+    if edit:
+        # imagens clicáveis (troca por upload)
+        html = html.replace('src="@@IMG_LOGO@@"', f'src="{valores["IMG_LOGO"]}" data-cms-img="logo" title="Clique para trocar a logo"')
+        html = html.replace('src="@@IMG_HERO@@"', f'src="{valores["IMG_HERO"]}" data-cms-img="hero" title="Clique para trocar a foto do topo"')
+        html = html.replace('src="@@IMG_DRINKS@@"', f'src="{valores["IMG_DRINKS"]}" data-cms-img="drinks" title="Clique para trocar a foto"')
+        # marcadores dentro de atributos não podem virar <span>: resolve antes
+        html = html.replace("mailto:@@EMAIL@@", "mailto:" + valores["EMAIL"])
+        html = html.replace("https://instagram.com/@@INSTA@@", "https://instagram.com/" + valores["INSTA"])
+        # preço do drink vira um campo só ("24,90") no modo edição
+        html = html.replace(
+            '<span class="big">@@DRINK_INT@@</span><span class="cents">@@DRINK_CENTS@@</span>',
+            f'<span class="big" data-key="site.drink.preco">{preco_drink}</span>')
+        for marker, (path, rich) in EDIT_TEXT.items():
+            extra = ' data-rich="1"' if rich else ""
+            valores[marker] = f'<span data-key="{path}"{extra}>{valores[marker]}</span>'
+
     for k, v in valores.items():
         html = html.replace(f"@@{k}@@", str(v))
+
+    if edit:
+        html = html.replace("</body>", EDITOR_UI + "\n</body>")
     return html
 
 
@@ -335,6 +406,165 @@ def publish_site(cfg):
 
 
 # --------------------------------------------------------------------------
+# Editor visual — barra, estilos e script injetados na página em modo edição
+# --------------------------------------------------------------------------
+EDITOR_UI = """
+<style>
+  [data-key]{transition:outline .15s,background .15s;cursor:text;min-width:8px}
+  [data-key]:hover{outline:2px dashed #c89a3e;background:rgba(200,154,62,.10);border-radius:3px}
+  [data-key]:focus{outline:2px solid #c89a3e;background:rgba(200,154,62,.14);border-radius:3px}
+  [data-cms-img]{cursor:pointer}
+  [data-cms-img]:hover{outline:3px dashed #c89a3e;outline-offset:-3px;filter:brightness(1.06)}
+  #cms-bar{position:fixed;left:0;right:0;bottom:0;z-index:9999;background:rgba(15,17,21,.96);
+    backdrop-filter:blur(8px);border-top:1px solid #333;display:flex;gap:16px;align-items:center;
+    justify-content:center;padding:12px 16px;font-family:system-ui,sans-serif;font-size:14px;color:#e8eaed;flex-wrap:wrap}
+  #cms-bar button{background:#25D366;color:#06210f;font-weight:700;border:0;border-radius:10px;
+    padding:11px 26px;cursor:pointer;font-size:15px}
+  #cms-bar button:hover{filter:brightness(1.08)}
+  #cms-bar a{color:#9aa0ab;text-decoration:none;font-size:13px}
+  #cms-hint{position:fixed;top:74px;right:14px;z-index:9999;background:rgba(15,17,21,.92);color:#cfd3da;
+    padding:10px 14px;border-radius:10px;font:13px system-ui;border:1px solid #3a4150;max-width:240px}
+  body{padding-bottom:70px}
+</style>
+<div id="cms-hint">🖌️ <b>Modo edição</b><br>Clique num texto para alterar.<br>Clique numa foto para trocar.</div>
+<div id="cms-bar">
+  <button onclick="cmsSave()">💾 Salvar alterações</button>
+  <span id="cms-st"></span>
+  <a href="./">← voltar ao painel</a>
+</div>
+<input type="file" id="cms-file" accept="image/*" style="display:none">
+<script>
+(function(){
+  var slotAtual = null;
+  document.querySelectorAll("[data-key]").forEach(function(n){
+    n.setAttribute("contenteditable","true");
+    n.setAttribute("spellcheck","false");
+  });
+  // sincroniza campos repetidos (mesmo data-key em mais de um lugar)
+  document.addEventListener("input", function(e){
+    var t = e.target.closest ? e.target.closest("[data-key]") : null;
+    if(!t) return;
+    var k = t.getAttribute("data-key");
+    document.querySelectorAll('[data-key="'+k+'"]').forEach(function(o){
+      if(o !== t){ o.innerHTML = t.innerHTML; }
+    });
+  });
+  // no modo edição, links não navegam; clique em foto abre o seletor
+  document.addEventListener("click", function(e){
+    var img = e.target.closest ? e.target.closest("[data-cms-img]") : null;
+    if(img){
+      slotAtual = img.getAttribute("data-cms-img");
+      document.getElementById("cms-file").click();
+      e.preventDefault(); return;
+    }
+    var a = e.target.closest ? e.target.closest("a") : null;
+    if(a && !a.closest("#cms-bar")){ e.preventDefault(); }
+  }, true);
+  function key(){
+    var k = localStorage.getItem("panelKey");
+    if(!k){ k = prompt("Chave do painel:") || ""; if(k) localStorage.setItem("panelKey", k); }
+    return k;
+  }
+  document.getElementById("cms-file").addEventListener("change", function(){
+    var f = this.files[0]; if(!f || !slotAtual) return;
+    var st = document.getElementById("cms-st");
+    st.textContent = "enviando foto...";
+    var fd = new FormData(); fd.append("arquivo", f);
+    fetch("api/upload/" + slotAtual, {method:"POST", headers:{"x-panel-key": key()}, body: fd})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j.ok){
+          document.querySelectorAll('[data-cms-img="'+slotAtual+'"]').forEach(function(i){ i.src = j.path; });
+          st.textContent = "✅ foto trocada e publicada!";
+        } else {
+          st.textContent = "❌ " + (j.erro || "erro");
+          if(j.erro && j.erro.indexOf("Chave") >= 0) localStorage.removeItem("panelKey");
+        }
+      }).catch(function(e){ st.textContent = "❌ " + e; });
+    this.value = "";
+  });
+  window.cmsSave = function(){
+    var st = document.getElementById("cms-st");
+    st.textContent = "salvando...";
+    var patch = {};
+    document.querySelectorAll("[data-key]").forEach(function(n){
+      var k = n.getAttribute("data-key");
+      patch[k] = n.getAttribute("data-rich") ? "__RICH__" + n.innerHTML : n.textContent;
+    });
+    fetch("api/save-visual", {method:"POST",
+      headers:{"content-type":"application/json","x-panel-key": key()},
+      body: JSON.stringify(patch)})
+      .then(function(r){return r.json();}).then(function(j){
+        if(j.ok){
+          st.textContent = "✅ salvo e publicado!";
+          setTimeout(function(){ location.reload(); }, 900);
+        } else {
+          st.textContent = "❌ " + (j.erro || "erro");
+          if(j.erro && j.erro.indexOf("Chave") >= 0) localStorage.removeItem("panelKey");
+        }
+      }).catch(function(e){ st.textContent = "❌ " + e; });
+  };
+})();
+</script>"""
+
+
+def _clean_rich(v):
+    """Permite só formatação leve (em/br/span/b/strong/i); remove o resto."""
+    v = re.sub(r"<\s*(script|style)[^>]*>.*?<\s*/\s*\1\s*>", "", v, flags=re.S | re.I)
+    v = re.sub(r"<(?!/?(em|br|span|b|strong|i)\b)[^>]*>", "", v, flags=re.I)
+    return v.replace(" ", " ").strip()
+
+
+def _plain(v):
+    v = re.sub(r"<[^>]+>", "", str(v))
+    return re.sub(r"\s+", " ", v.replace(" ", " ")).strip()
+
+
+def _apply_visual(cfg, key, raw):
+    """Aplica um campo do editor visual (caminho pontilhado) na config."""
+    rich = isinstance(raw, str) and raw.startswith("__RICH__")
+    v = raw[8:] if rich else str(raw)
+    v = _clean_rich(v) if rich else _plain(v)
+    parts = key.split(".")
+    if parts[0] not in ("site", "bot") or len(parts) < 2:
+        return
+    if key == "site.visita.endereco":
+        v = re.sub(r"<br\s*/?>", "\n", v, flags=re.I)
+        v = re.sub(r"<[^>]+>", "", v)
+        cfg["site"]["visita"]["endereco"] = "\n".join(
+            l.strip() for l in v.splitlines() if l.strip())
+        return
+    if parts[:2] == ["site", "combo"] and len(parts) == 4 and parts[2] in ("entradas", "principal", "sobremesas"):
+        i = int(parts[3])
+        lines = (cfg["site"].setdefault("combo", {}).get(parts[2]) or "").splitlines()
+        while len(lines) <= i:
+            lines.append("")
+        lines[i] = v
+        cfg["site"]["combo"][parts[2]] = "\n".join(lines)
+        return
+    if key.startswith("bot.cardapio.") and key.endswith(".preco"):
+        num = re.sub(r"[^\d,]", "", v).replace(",", ".")
+        try:
+            cfg["bot"]["cardapio"][int(parts[2])]["preco"] = float(num) if num else 0.0
+        except (ValueError, IndexError, KeyError):
+            pass
+        return
+    if key == "site.drink.preco":
+        cfg["site"].setdefault("drink", {})["preco"] = v.replace("R$", "").strip()
+        return
+    node = cfg[parts[0]]
+    try:
+        for p in parts[1:-1]:
+            node = node[int(p)] if isinstance(node, list) else node.setdefault(p, {})
+        last = parts[-1]
+        if isinstance(node, list):
+            node[int(last)] = v
+        elif isinstance(node, dict):
+            node[last] = v
+    except (ValueError, IndexError, KeyError, TypeError, AttributeError):
+        pass
+
+
+# --------------------------------------------------------------------------
 # Flask
 # --------------------------------------------------------------------------
 app = Flask(__name__)
@@ -357,6 +587,11 @@ def painel():
         return Response(f.read(), mimetype="text/html")
 
 
+@app.get("/editor")
+def editor():
+    return Response(render_site(load_cfg(), edit=True), mimetype="text/html")
+
+
 @app.get("/api/config")
 def api_config():
     return _json(load_cfg())
@@ -377,6 +612,25 @@ def api_save():
         return _json({"ok": False, "erro": "JSON inválido"}, 400)
     cfg = load_cfg()
     cfg.update(body or {})
+    save_cfg(cfg)
+    ok, msg = publish_site(cfg)
+    return _json({"ok": True, "publicado": ok, "msg": msg})
+
+
+@app.post("/api/save-visual")
+def api_save_visual():
+    if not _auth_ok():
+        return _json({"ok": False, "erro": "Chave do painel inválida."}, 401)
+    try:
+        patch = request.get_json(force=True) or {}
+    except Exception:
+        return _json({"ok": False, "erro": "JSON inválido"}, 400)
+    cfg = load_cfg()
+    for k, v in patch.items():
+        try:
+            _apply_visual(cfg, str(k), v)
+        except Exception:
+            pass
     save_cfg(cfg)
     ok, msg = publish_site(cfg)
     return _json({"ok": True, "publicado": ok, "msg": msg})
