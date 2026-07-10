@@ -155,6 +155,14 @@ DEFAULT_SITE = {
         "canal": "Telegram",
         "direitos": "Todos os direitos reservados.",
         "foot_tag": "Petrópolis · Cidade Imperial",
+        "nav_casa": "A casa",
+        "nav_cardapio": "Cardápio",
+        "nav_drinks": "Pra beber",
+        "nav_visite": "Visite",
+        "foot_visita": "Onde estamos",
+        "foot_h_nav": "Navegação",
+        "foot_h_contato": "Contato",
+        "foot_h_endereco": "Endereço",
     },
 }
 
@@ -453,6 +461,10 @@ def publish_site(cfg):
 # --------------------------------------------------------------------------
 EDITOR_UI = """
 <style>
+  /* modo edição: congela os efeitos de hover pra dar pra clicar e digitar */
+  a, .btn, .tg-btn, .vlink, .item, .exp-card { transition: none !important; }
+  .btn:hover, .tg-btn:hover, .btn-gold:hover, .btn-ghost:hover, .exp-card:hover { transform: none !important; }
+  .item:hover { padding-left: 0 !important; }
   [data-key]{transition:outline .15s,background .15s;cursor:text;min-width:8px}
   [data-key]:hover{outline:2px dashed #c89a3e;background:rgba(200,154,62,.10);border-radius:3px}
   [data-key]:focus{outline:2px solid #c89a3e;background:rgba(200,154,62,.14);border-radius:3px}
