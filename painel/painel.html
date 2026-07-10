@@ -345,7 +345,8 @@ function collectSite() {
     t: div.querySelector(".cc_t").value.trim(), d: div.querySelector(".cc_d").value.trim() }));
   const subs = {};
   document.querySelectorAll(".msub").forEach(i => { if (i.value.trim()) subs[i.dataset.cat] = i.value.trim(); });
-  return {
+  // parte de SITE (ex: "textos" do editor visual) que o formulário não cobre: preserva
+  return Object.assign(JSON.parse(JSON.stringify(SITE||{})), {
     emBreve: el("s_embreve").checked,
     emBreveMsg: el("s_embreve_msg").value.trim(),
     meta_title: el("s_meta_title").value.trim(),
@@ -371,7 +372,7 @@ function collectSite() {
     contato: { tel: el("s_tel").value.trim(), email: el("s_email").value.trim(), insta: el("s_insta").value.trim().replace(/^@/,"") },
     bot_link: el("s_bot_link").value.trim(),
     img: SITE.img || {},
-  };
+  });
 }
 
 function collectBot() {

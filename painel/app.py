@@ -125,7 +125,41 @@ DEFAULT_SITE = {
     "contato": {"tel": "(24) 2017-9899", "email": "labodegapetropolis@gmail.com", "insta": "labodegapetropolis"},
     "bot_link": "https://t.me/labodegapatio_bot?start=qr",
     "img": {"logo": "/img/logo.png", "hero": "/img/hero-bg.jpg", "drinks": "/img/drinks.jpg"},
+    # Textos menores espalhados pelo site (títulos de seção, botões, rótulos)
+    "textos": {
+        "eyebrow_menu": "O cardápio",
+        "eyebrow_drinks": "Pra beber",
+        "eyebrow_combo": "Combinação da casa",
+        "eyebrow_visita": "Onde nos encontrar",
+        "eyebrow_bot": "Fale com a gente",
+        "visita_h2": "Suba e fique à vontade",
+        "card_endereco": "Endereço",
+        "card_horarios": "Horários",
+        "combo_h1": "Entradas",
+        "combo_h2": "Principal",
+        "combo_h3": "Sobremesas",
+        "btn_cardapio": "Ver cardápio",
+        "btn_falar": "Falar com a gente",
+        "btn_carta": "Ver a carta completa",
+        "btn_conversa": "Abrir conversa no Telegram",
+        "maps_txt": "Abrir no Google Maps →",
+        "conf_horario": "Confirmar horário no Telegram →",
+        "bot_h2": "O La Bodega <em>no seu bolso</em>",
+        "bot_p": "Aponte a câmera pro código ou toque no botão. Você cai direto numa conversa com o nosso atendente no Telegram — sem instalar nada além do app.",
+        "bot_f1": "Ver o cardápio e as promoções do dia",
+        "bot_f2": "Fazer reserva e tirar dúvidas",
+        "bot_f3": "Conferir horários e como chegar",
+        "qr_cap": "Aponte a câmera",
+        "qr_sub": "Leva direto pro nosso atendimento",
+        "qr_handle": "t.me/labodegapatio_bot",
+        "canal": "Telegram",
+        "direitos": "Todos os direitos reservados.",
+        "foot_tag": "Petrópolis · Cidade Imperial",
+    },
 }
+
+# textos com formatação leve permitida no editor visual
+TEXTOS_RICOS = {"bot_h2"}
 
 # Campos de texto editáveis no editor visual: marcador -> (caminho, aceita html leve)
 EDIT_TEXT = {
@@ -336,6 +370,8 @@ def render_site(cfg, edit=False):
         c = cards[i] if i < len(cards) else {"t": "", "d": ""}
         valores[f"CASA{i+1}_T"] = c.get("t", "")
         valores[f"CASA{i+1}_D"] = c.get("d", "")
+    for k, v in (site.get("textos") or {}).items():
+        valores[f"TXT_{k.upper()}"] = v
 
     if edit:
         # imagens clicáveis (troca por upload)
@@ -352,6 +388,13 @@ def render_site(cfg, edit=False):
         for marker, (path, rich) in EDIT_TEXT.items():
             extra = ' data-rich="1"' if rich else ""
             valores[marker] = f'<span data-key="{path}"{extra}>{valores[marker]}</span>'
+        for k in (site.get("textos") or {}):
+            marker = f"TXT_{k.upper()}"
+            extra = ' data-rich="1"' if k in TEXTOS_RICOS else ""
+            valores[marker] = f'<span data-key="site.textos.{k}"{extra}>{valores[marker]}</span>'
+        # endereço do rodapé edita junto com o do bloco "Visita"
+        valores["FOOT_ENDERECO"] = (
+            f'<span data-key="site.visita.endereco" data-rich="1">{valores["FOOT_ENDERECO"]}</span>')
 
     for k, v in valores.items():
         html = html.replace(f"@@{k}@@", str(v))
@@ -528,7 +571,7 @@ def _apply_visual(cfg, key, raw):
     if parts[0] not in ("site", "bot") or len(parts) < 2:
         return
     if key == "site.visita.endereco":
-        v = re.sub(r"<br\s*/?>", "\n", v, flags=re.I)
+        v = re.sub(r"<br\s*/?>|</p>|</div>", "\n", v, flags=re.I)
         v = re.sub(r"<[^>]+>", "", v)
         cfg["site"]["visita"]["endereco"] = "\n".join(
             l.strip() for l in v.splitlines() if l.strip())
