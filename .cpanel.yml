@@ -1,7 +1,14 @@
 ---
 deployment:
   tasks:
+    # ---- Site (public_html) ----
     - export DEPLOYPATH=/home/labodegapetropol/public_html
     - /bin/mkdir -p $DEPLOYPATH/img
     - /bin/cp -f public/index.html $DEPLOYPATH/
     - /bin/cp -f public/img/* $DEPLOYPATH/img/
+    # ---- Painel (app Python) — NÃO copia data/ p/ preservar edições ----
+    - export PANELPATH=/home/labodegapetropol/painel
+    - /bin/cp -f painel/passenger_wsgi.py $PANELPATH/
+    - /bin/cp -f painel/app.py $PANELPATH/
+    - /bin/cp -f painel/painel.html $PANELPATH/
+    - /bin/cp -f painel/requirements.txt $PANELPATH/
