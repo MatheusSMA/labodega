@@ -1,14 +1,15 @@
 ---
 deployment:
   tasks:
-    # ---- Site (public_html) ----
+    # ---- Site: só as imagens padrão. O index.html é GERADO pelo painel
+    #      (não copiar, senão sobrescreve as edições do cliente). ----
     - export DEPLOYPATH=/home/labodegapetropol/public_html
     - /bin/mkdir -p $DEPLOYPATH/img
-    - /bin/cp -f public/index.html $DEPLOYPATH/
     - /bin/cp -f public/img/* $DEPLOYPATH/img/
-    # ---- Painel (app Python) — NÃO copia data/ p/ preservar edições ----
+    # ---- Painel (app Python) — data/ é preservado ----
     - export PANELPATH=/home/labodegapetropol/painel
     - /bin/cp -f painel/passenger_wsgi.py $PANELPATH/
     - /bin/cp -f painel/app.py $PANELPATH/
     - /bin/cp -f painel/painel.html $PANELPATH/
+    - /bin/cp -f painel/site_template.html $PANELPATH/
     - /bin/cp -f painel/requirements.txt $PANELPATH/
