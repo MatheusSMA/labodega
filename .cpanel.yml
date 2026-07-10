@@ -11,5 +11,6 @@ deployment:
     - /bin/cp -f painel/passenger_wsgi.py $PANELPATH/
     - /bin/cp -f painel/app.py $PANELPATH/
     - /bin/cp -f painel/painel.html $PANELPATH/
+    - /bin/cp -f painel/login.html $PANELPATH/
     - /bin/cp -f painel/site_template.html $PANELPATH/
     - /bin/cp -f painel/requirements.txt $PANELPATH/

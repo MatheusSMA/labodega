@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar — Painel do Restaurante</title>
+<style>
+  * { box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(90% 90% at 50% 15%, #2c2823, #16130f 75%); color:#e8e1d0; padding:24px; }
+  .card { background:#1b1e26; border:1px solid #2f333f; border-radius:18px; padding:34px 30px;
+    width:100%; max-width:380px; box-shadow:0 30px 80px -30px rgba(0,0,0,.7); }
+  h1 { font-size:20px; margin:0 0 4px; text-align:center; }
+  .sub { text-align:center; color:#9aa0ab; font-size:13px; margin-bottom:26px; }
+  label { display:block; font-size:13px; color:#9aa0ab; margin-bottom:12px; }
+  input[type=text], input[type=password] { width:100%; margin-top:5px; background:#0f1115;
+    border:1px solid #313644; color:#fff; border-radius:9px; padding:11px 12px; font-size:15px; }
+  input:focus { outline:none; border-color:#c89a3e; }
+  .chk { display:flex; align-items:center; gap:8px; font-size:14px; color:#cfd3da; margin:4px 0 18px; cursor:pointer; }
+  button { width:100%; background:#c89a3e; color:#1b1916; font-weight:700; font-size:15px;
+    border:0; border-radius:11px; padding:13px; cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+  #st, #st2 { display:block; text-align:center; font-size:13px; margin-top:12px; min-height:18px; }
+  details { margin-top:22px; border-top:1px solid #2f333f; padding-top:14px; }
+  summary { color:#9aa0ab; font-size:13px; cursor:pointer; }
+  details .inner { margin-top:14px; }
+  .hint { font-size:12px; color:#6b717c; margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🍽️ Painel do Restaurante</h1>
+  <div class="sub">La Bodega · Rooftop</div>
+
+  <label>Usuário<input type="text" id="usuario" autocomplete="username"></label>
+  <label>Senha<input type="password" id="senha" autocomplete="current-password"></label>
+  <label class="chk"><input type="checkbox" id="lembrar" checked> Continuar conectado</label>
+  <button onclick="entrar()">Entrar</button>
+  <span id="st"></span>
+
+  <details id="primeiro">
+    <summary>Primeiro acesso? Criar o usuário do painel</summary>
+    <div class="inner">
+      <label>Chave do painel (técnica)<input type="password" id="pa_chave"></label>
+      <label>Novo usuário<input type="text" id="pa_usuario" placeholder="ex: labodega"></label>
+      <label>Nova senha (6+ caracteres)<input type="password" id="pa_senha"></label>
+      <button onclick="criar()" style="background:#25D366;color:#06210f">Criar e entrar</button>
+      <span id="st2"></span>
+      <div class="hint">Só funciona uma vez, enquanto não existe usuário. Depois, é só login normal.</div>
+    </div>
+  </details>
+</div>
+
+<script>
+const el = id => document.getElementById(id);
+if ("__TEM_USUARIOS__" === "0") { el("primeiro").open = true; }
+
+function entrar() {
+  const st = el("st"); st.textContent = "entrando..."; st.style.color = "#9aa0ab";
+  fetch("api/login", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ usuario: el("usuario").value, senha: el("senha").value, lembrar: el("lembrar").checked }) })
+    .then(r => r.json()).then(j => {
+      if (j.ok) { location.href = "./"; }
+      else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
+    }).catch(e => { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; });
+}
+document.addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
+
+function criar() {
+  const st = el("st2"); st.textContent = "criando..."; st.style.color = "#9aa0ab";
+  fetch("api/primeiro-acesso", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ chave: el("pa_chave").value, usuario: el("pa_usuario").value, senha: el("pa_senha").value }) })
+    .then(r => r.json()).then(j => {
+      if (j.ok) { location.href = "./"; }
+      else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
+    }).catch(e => { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; });
+}
+</script>
+</body>
+</html>

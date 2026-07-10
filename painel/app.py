@@ -12,11 +12,13 @@ Roda em labodegapetropolis.com.br/painel. Edita o BOT e o SITE:
 Proteção de escrita: header x-panel-key == env PANEL_KEY (Setup Python App).
 """
 import glob
+import hashlib
 import json
 import os
 import re
+import secrets
 import time
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, session, redirect, url_for
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE, "data")
@@ -515,25 +517,21 @@ EDITOR_UI = """
     var a = e.target.closest ? e.target.closest("a") : null;
     if(a && !a.closest("#cms-bar")){ e.preventDefault(); }
   }, true);
-  function key(){
-    var k = localStorage.getItem("panelKey");
-    if(!k){ k = prompt("Chave do painel:") || ""; if(k) localStorage.setItem("panelKey", k); }
-    return k;
+  function trata(r){
+    if(r.status === 401){ location.href = "login"; throw new Error("sem login"); }
+    return r.json();
   }
   document.getElementById("cms-file").addEventListener("change", function(){
     var f = this.files[0]; if(!f || !slotAtual) return;
     var st = document.getElementById("cms-st");
     st.textContent = "enviando foto...";
     var fd = new FormData(); fd.append("arquivo", f);
-    fetch("api/upload/" + slotAtual, {method:"POST", headers:{"x-panel-key": key()}, body: fd})
-      .then(function(r){return r.json();}).then(function(j){
+    fetch("api/upload/" + slotAtual, {method:"POST", body: fd})
+      .then(trata).then(function(j){
         if(j.ok){
           document.querySelectorAll('[data-cms-img="'+slotAtual+'"]').forEach(function(i){ i.src = j.path; });
           st.textContent = "✅ foto trocada e publicada!";
-        } else {
-          st.textContent = "❌ " + (j.erro || "erro");
-          if(j.erro && j.erro.indexOf("Chave") >= 0) localStorage.removeItem("panelKey");
-        }
+        } else { st.textContent = "❌ " + (j.erro || "erro"); }
       }).catch(function(e){ st.textContent = "❌ " + e; });
     this.value = "";
   });
@@ -546,16 +544,13 @@ EDITOR_UI = """
       patch[k] = n.getAttribute("data-rich") ? "__RICH__" + n.innerHTML : n.textContent;
     });
     fetch("api/save-visual", {method:"POST",
-      headers:{"content-type":"application/json","x-panel-key": key()},
+      headers:{"content-type":"application/json"},
       body: JSON.stringify(patch)})
-      .then(function(r){return r.json();}).then(function(j){
+      .then(trata).then(function(j){
         if(j.ok){
           st.textContent = "✅ salvo e publicado!";
           setTimeout(function(){ location.reload(); }, 900);
-        } else {
-          st.textContent = "❌ " + (j.erro || "erro");
-          if(j.erro && j.erro.indexOf("Chave") >= 0) localStorage.removeItem("panelKey");
-        }
+        } else { st.textContent = "❌ " + (j.erro || "erro"); }
       }).catch(function(e){ st.textContent = "❌ " + e; });
   };
 })();
@@ -625,6 +620,45 @@ def _apply_visual(cfg, key, raw):
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB p/ upload
 
+# ---- sessão / login ----
+_SECRET_FILE = os.path.join(DATA_DIR, "secret.txt")
+if not os.path.exists(_SECRET_FILE):
+    with open(_SECRET_FILE, "w") as f:
+        f.write(secrets.token_hex(32))
+app.secret_key = open(_SECRET_FILE).read().strip()
+app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 31  # "lembrar": 31 dias
+
+USERS_FILE = os.path.join(DATA_DIR, "users.json")
+
+
+def _users():
+    try:
+        with open(USERS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _hash_senha(senha, salt):
+    return hashlib.pbkdf2_hmac("sha256", senha.encode(), bytes.fromhex(salt), 200_000).hex()
+
+
+def _criar_usuario(usuario, senha):
+    users = _users()
+    salt = secrets.token_hex(16)
+    users[usuario] = {"salt": salt, "hash": _hash_senha(senha, salt)}
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
+
+
+def _login_valido(usuario, senha):
+    u = _users().get(usuario)
+    return bool(u) and secrets.compare_digest(_hash_senha(senha, u["salt"]), u["hash"])
+
+
+def _logado():
+    return bool(session.get("user"))
+
 
 def _json(obj, status=200):
     return Response(json.dumps(obj, ensure_ascii=False), status=status,
@@ -632,19 +666,72 @@ def _json(obj, status=200):
 
 
 def _auth_ok():
+    # sessão logada OU chave técnica no header (compatibilidade p/ scripts)
+    if _logado():
+        return True
     key = request.headers.get("x-panel-key", "")
     return bool(PANEL_KEY) and key == PANEL_KEY
 
 
 @app.get("/")
 def painel():
+    if not _logado():
+        return redirect(url_for("login_page"))
     with open(os.path.join(BASE, "painel.html"), encoding="utf-8") as f:
         return Response(f.read(), mimetype="text/html")
 
 
 @app.get("/editor")
 def editor():
+    if not _logado():
+        return redirect(url_for("login_page"))
     return Response(render_site(load_cfg(), edit=True), mimetype="text/html")
+
+
+@app.get("/login")
+def login_page():
+    if _logado():
+        return redirect(url_for("painel"))
+    with open(os.path.join(BASE, "login.html"), encoding="utf-8") as f:
+        html = f.read()
+    # sem usuário criado ainda? o bloco "primeiro acesso" abre sozinho
+    return Response(html.replace("__TEM_USUARIOS__", "1" if _users() else "0"),
+                    mimetype="text/html")
+
+
+@app.get("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
+
+
+@app.post("/api/login")
+def api_login():
+    body = request.get_json(force=True, silent=True) or {}
+    usuario = (body.get("usuario") or "").strip().lower()
+    senha = body.get("senha") or ""
+    if not _login_valido(usuario, senha):
+        return _json({"ok": False, "erro": "Usuário ou senha incorretos."}, 401)
+    session.permanent = bool(body.get("lembrar"))
+    session["user"] = usuario
+    return _json({"ok": True})
+
+
+@app.post("/api/primeiro-acesso")
+def api_primeiro_acesso():
+    body = request.get_json(force=True, silent=True) or {}
+    if _users():
+        return _json({"ok": False, "erro": "Já existe usuário criado. Faça login normal."}, 400)
+    if not PANEL_KEY or (body.get("chave") or "") != PANEL_KEY:
+        return _json({"ok": False, "erro": "Chave do painel incorreta."}, 401)
+    usuario = (body.get("usuario") or "").strip().lower()
+    senha = body.get("senha") or ""
+    if len(usuario) < 3 or len(senha) < 6:
+        return _json({"ok": False, "erro": "Usuário precisa de 3+ letras e senha de 6+ caracteres."}, 400)
+    _criar_usuario(usuario, senha)
+    session.permanent = True
+    session["user"] = usuario
+    return _json({"ok": True})
 
 
 @app.get("/api/config")

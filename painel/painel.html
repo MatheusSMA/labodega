@@ -42,6 +42,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('bot')" id="tab-bot">Bot</button>
     <button class="tab" onclick="showTab('site')" id="tab-site">Site</button>
+    <a href="logout" style="color:#9aa0ab;font-size:13px;align-self:center;margin-left:8px;text-decoration:none" title="Sair do painel">Sair ⎋</a>
   </div>
 </div>
 
@@ -199,10 +200,9 @@ function showTab(t) {
   el("tab-bot").classList.toggle("active", t==="bot");
   el("tab-site").classList.toggle("active", t==="site");
 }
-function getKey() {
-  let k = localStorage.getItem("panelKey");
-  if (!k) { k = prompt("Digite a CHAVE do painel (a que você configurou no cPanel):") || ""; if (k) localStorage.setItem("panelKey", k); }
-  return k;
+function trata(res) {
+  if (res.status === 401) { location.href = "login"; throw new Error("sem login"); }
+  return res.json();
 }
 function fillHorarios(h) {
   el("horarios").innerHTML = "";
@@ -274,17 +274,16 @@ async function enviarImg(slot, btn) {
   const input = document.querySelector(`.upfile[data-slot="${slot}"]`);
   const st = document.querySelector(`.upst[data-slot="${slot}"]`);
   if (!input.files[0]) { st.textContent = "escolha um arquivo"; st.style.color = "#ffb454"; return; }
-  const key = getKey(); if (!key) return;
   st.textContent = "enviando..."; st.style.color = "#9aa0ab";
   const fd = new FormData(); fd.append("arquivo", input.files[0]);
   try {
-    const res = await fetch(API + "/upload/" + slot, { method:"POST", headers:{"x-panel-key":key}, body: fd });
-    const j = await res.json();
+    const res = await fetch(API + "/upload/" + slot, { method:"POST", body: fd });
+    const j = await trata(res);
     if (j.ok) {
       st.textContent = "✅ trocada no site!"; st.style.color = "#25D366";
       SITE.img = SITE.img||{}; SITE.img[slot] = j.path;
       fillImagens();
-    } else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; if (res.status===401) localStorage.removeItem("panelKey"); }
+    } else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
   } catch (e) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; }
 }
 
@@ -388,24 +387,22 @@ function collectBot() {
     reservas: { aceita: el("rv_aceita").checked, max_pessoas: parseInt(el("rv_max").value||"0")||0, antecedencia: el("rv_ant").value.trim() },
     delivery: { faz: el("dl_faz").checked, bairros: el("dl_bairros").value.trim(), taxa: el("dl_taxa").value.trim(), tempo: el("dl_tempo").value.trim() },
     pagamento: [...document.querySelectorAll(".pg:checked")].map(x=>x.value),
-    cardapio: [...document.querySelectorAll(".crow")].map(r=>({
+    cardapio: [...document.querySelectorAll("#cardapio .crow")].map(r=>({
       categoria: r.querySelector(".c_cat").value.trim(), nome: r.querySelector(".c_nome").value.trim(),
       preco: parseFloat(r.querySelector(".c_preco").value||"0")||0,
       desc: r.querySelector(".c_desc").value.trim(), tags: r.querySelector(".c_tags").value.trim() })).filter(it=>it.nome),
-    faq: [...document.querySelectorAll(".frow")].map(r=>({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q=>q.p),
+    faq: [...document.querySelectorAll("#faq .frow")].map(r=>({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q=>q.p),
   };
 }
 async function salvar() {
   const st = el("status"); st.textContent = "Salvando..."; st.style.color = "#9aa0ab";
-  const key = getKey();
-  if (!key) { st.textContent = "Precisa da chave pra salvar."; st.style.color = "#ffb454"; return; }
   try {
-    const res = await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json","x-panel-key":key}, body: JSON.stringify({ bot: collectBot(), site: collectSite() }) });
-    const j = await res.json();
+    const res = await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ bot: collectBot(), site: collectSite() }) });
+    const j = await trata(res);
     if (j.ok && j.publicado) { st.textContent = "✅ Salvo e site atualizado!"; st.style.color = "#25D366"; }
     else if (j.ok) { st.textContent = "⚠ Salvo, mas o site não publicou: " + (j.msg||""); st.style.color = "#ffb454"; }
-    else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; if (res.status===401) localStorage.removeItem("panelKey"); }
-  } catch (e) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; }
+    else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
+  } catch (e) { if (String(e).indexOf("sem login") < 0) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; } }
 }
 (async () => {
   try {
