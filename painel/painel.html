@@ -42,6 +42,7 @@
   <div class="tabs">
     <button class="tab active" onclick="showTab('bot')" id="tab-bot">Bot</button>
     <button class="tab" onclick="showTab('site')" id="tab-site">Site</button>
+    <button class="tab" onclick="showTab('users')" id="tab-users">Usuários</button>
     <a href="logout" style="color:#9aa0ab;font-size:13px;align-self:center;margin-left:8px;text-decoration:none" title="Sair do painel">Sair ⎋</a>
   </div>
 </div>
@@ -180,6 +181,38 @@
     </div>
   </div>
 
+  <!-- ================= ABA USUÁRIOS ================= -->
+  <div id="pane-users" class="hidden">
+    <div class="card">
+      <h2>Minha conta</h2>
+      <p style="margin:0 0 12px;font-size:14px">Conectado como <b id="me_user">…</b> <span id="me_badge"></span></p>
+      <div class="grid2">
+        <label class="field">Senha atual<input type="password" id="ms_atual"></label>
+        <label class="field">Nova senha (6+)<input type="password" id="ms_nova"></label>
+      </div>
+      <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="trocarMinhaSenha()">🔑 Trocar minha senha</button>
+      <span id="ms_st" style="font-size:13px;margin-left:10px"></span>
+    </div>
+
+    <div id="admin_users" class="hidden">
+      <div class="card">
+        <h2>Usuários do painel</h2>
+        <div id="lista_users"></div>
+        <small class="dim">Redefinir senha: digite a nova senha na linha do usuário e clique em 🔑. Remover: ✕.</small>
+      </div>
+      <div class="card">
+        <h2>Novo usuário</h2>
+        <div class="grid2">
+          <label class="field">Usuário (3+ letras)<input id="nu_user" placeholder="ex: labodega"></label>
+          <label class="field">Senha (6+ caracteres)<input type="password" id="nu_senha"></label>
+        </div>
+        <label class="chk"><input type="checkbox" id="nu_admin"> Administrador (gerencia usuários — normalmente só você)</label>
+        <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="criarUsuario()">➕ Criar usuário</button>
+        <span id="nu_st" style="font-size:13px;margin-left:10px"></span>
+      </div>
+    </div>
+  </div>
+
   <div class="bar">
     <button class="save" onclick="salvar()">💾 Salvar</button>
     <span id="status"></span>
@@ -195,10 +228,67 @@ const el = id => document.getElementById(id);
 const esc = s => (s||"").replace(/"/g,"&quot;");
 
 function showTab(t) {
-  el("pane-bot").classList.toggle("hidden", t!=="bot");
-  el("pane-site").classList.toggle("hidden", t!=="site");
-  el("tab-bot").classList.toggle("active", t==="bot");
-  el("tab-site").classList.toggle("active", t==="site");
+  ["bot","site","users"].forEach(x => {
+    el("pane-"+x).classList.toggle("hidden", t!==x);
+    el("tab-"+x).classList.toggle("active", t===x);
+  });
+}
+
+// ================= ABA USUÁRIOS =================
+async function carregarMe() {
+  try {
+    const me = await trata(await fetch(API + "/me"));
+    if (!me.ok) return;
+    el("me_user").textContent = me.usuario;
+    el("me_badge").innerHTML = me.admin ? '<span style="color:#c89a3e">· administrador</span>' : "";
+    if (me.admin) { el("admin_users").classList.remove("hidden"); carregarUsuarios(); }
+  } catch (e) {}
+}
+
+async function carregarUsuarios() {
+  const j = await trata(await fetch(API + "/usuarios"));
+  if (!j.ok) return;
+  const box = el("lista_users"); box.innerHTML = "";
+  j.usuarios.forEach(u => {
+    const row = document.createElement("div"); row.className = "frow";
+    row.innerHTML = `<span style="flex:1;align-self:center;font-size:14px"><b>${esc(u.usuario)}</b>${u.admin?' <span style="color:#c89a3e;font-size:12px">admin</span>':""}</span>
+      <input type="password" class="rs_senha" placeholder="nova senha (6+)" style="flex:1">
+      <button type="button" class="del" style="color:#c89a3e" title="Redefinir senha" onclick="redefinirSenha('${esc(u.usuario)}', this)">🔑</button>
+      <button type="button" class="del" title="Remover usuário" onclick="removerUsuario('${esc(u.usuario)}')">✕</button>`;
+    box.appendChild(row);
+  });
+}
+
+async function criarUsuario() {
+  const st = el("nu_st"); st.textContent = "criando..."; st.style.color = "#9aa0ab";
+  const j = await trata(await fetch(API + "/usuarios", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ usuario: el("nu_user").value, senha: el("nu_senha").value, admin: el("nu_admin").checked }) }));
+  if (j.ok) { st.textContent = "✅ criado!"; st.style.color = "#25D366"; el("nu_user").value=""; el("nu_senha").value=""; el("nu_admin").checked=false; carregarUsuarios(); }
+  else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
+}
+
+async function redefinirSenha(usuario, btn) {
+  const senha = btn.parentElement.querySelector(".rs_senha").value;
+  const j = await trata(await fetch(API + "/usuarios/senha", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ usuario, senha }) }));
+  alert(j.ok ? "Senha de \"" + usuario + "\" redefinida!" : "Erro: " + (j.erro||""));
+  if (j.ok) carregarUsuarios();
+}
+
+async function removerUsuario(usuario) {
+  if (!confirm("Remover o usuário \"" + usuario + "\"? Ele perde o acesso ao painel.")) return;
+  const j = await trata(await fetch(API + "/usuarios/remover", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ usuario }) }));
+  if (!j.ok) alert("Erro: " + (j.erro||""));
+  carregarUsuarios();
+}
+
+async function trocarMinhaSenha() {
+  const st = el("ms_st"); st.textContent = "trocando..."; st.style.color = "#9aa0ab";
+  const j = await trata(await fetch(API + "/minha-senha", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ atual: el("ms_atual").value, nova: el("ms_nova").value }) }));
+  if (j.ok) { st.textContent = "✅ senha trocada!"; st.style.color = "#25D366"; el("ms_atual").value=""; el("ms_nova").value=""; }
+  else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
 }
 function trata(res) {
   if (res.status === 401) { location.href = "login"; throw new Error("sem login"); }
@@ -409,6 +499,7 @@ async function salvar() {
     const cfg = await (await fetch(API + "/config")).json();
     fillForm(cfg.bot || {});
     fillSiteTab(cfg.site || {});
+    carregarMe();
   } catch (e) { el("status").textContent = "Erro ao carregar: " + e; }
 })();
 </script>

@@ -631,24 +631,34 @@ app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 31  # "lembrar": 31 di
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
 
+def _save_users(users):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
+
+
 def _users():
     try:
         with open(USERS_FILE, encoding="utf-8") as f:
-            return json.load(f)
+            users = json.load(f)
     except Exception:
         return {}
+    # migração: se ninguém é admin, o primeiro usuário criado vira admin
+    if users and not any(u.get("admin") for u in users.values()):
+        primeiro = next(iter(users))
+        users[primeiro]["admin"] = True
+        _save_users(users)
+    return users
 
 
 def _hash_senha(senha, salt):
     return hashlib.pbkdf2_hmac("sha256", senha.encode(), bytes.fromhex(salt), 200_000).hex()
 
 
-def _criar_usuario(usuario, senha):
+def _criar_usuario(usuario, senha, admin=False):
     users = _users()
     salt = secrets.token_hex(16)
-    users[usuario] = {"salt": salt, "hash": _hash_senha(senha, salt)}
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, indent=2)
+    users[usuario] = {"salt": salt, "hash": _hash_senha(senha, salt), "admin": bool(admin)}
+    _save_users(users)
 
 
 def _login_valido(usuario, senha):
@@ -669,6 +679,14 @@ def _auth_ok():
     # sessão logada OU chave técnica no header (compatibilidade p/ scripts)
     if _logado():
         return True
+    key = request.headers.get("x-panel-key", "")
+    return bool(PANEL_KEY) and key == PANEL_KEY
+
+
+def _admin_ok():
+    # admin logado OU chave técnica (a chave é o "super admin" de emergência)
+    if _logado():
+        return bool((_users().get(session["user"]) or {}).get("admin"))
     key = request.headers.get("x-panel-key", "")
     return bool(PANEL_KEY) and key == PANEL_KEY
 
@@ -728,9 +746,96 @@ def api_primeiro_acesso():
     senha = body.get("senha") or ""
     if len(usuario) < 3 or len(senha) < 6:
         return _json({"ok": False, "erro": "Usuário precisa de 3+ letras e senha de 6+ caracteres."}, 400)
-    _criar_usuario(usuario, senha)
+    _criar_usuario(usuario, senha, admin=True)  # o primeiro usuário é o dono/admin
     session.permanent = True
     session["user"] = usuario
+    return _json({"ok": True})
+
+
+# ---------------- gestão de usuários (aba Usuários) ----------------
+@app.get("/api/me")
+def api_me():
+    if not _logado():
+        return _json({"ok": False}, 401)
+    u = _users().get(session["user"]) or {}
+    return _json({"ok": True, "usuario": session["user"], "admin": bool(u.get("admin"))})
+
+
+@app.get("/api/usuarios")
+def api_usuarios_listar():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o administrador pode gerenciar usuários."}, 403)
+    return _json({"ok": True, "usuarios": [
+        {"usuario": k, "admin": bool(v.get("admin"))} for k, v in _users().items()]})
+
+
+@app.post("/api/usuarios")
+def api_usuarios_criar():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o administrador pode criar usuários."}, 403)
+    body = request.get_json(force=True, silent=True) or {}
+    usuario = (body.get("usuario") or "").strip().lower()
+    senha = body.get("senha") or ""
+    if len(usuario) < 3 or len(senha) < 6:
+        return _json({"ok": False, "erro": "Usuário precisa de 3+ letras e senha de 6+ caracteres."}, 400)
+    if usuario in _users():
+        return _json({"ok": False, "erro": "Esse usuário já existe."}, 400)
+    _criar_usuario(usuario, senha, admin=bool(body.get("admin")))
+    return _json({"ok": True})
+
+
+@app.post("/api/usuarios/senha")
+def api_usuarios_senha():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o administrador pode redefinir senhas."}, 403)
+    body = request.get_json(force=True, silent=True) or {}
+    usuario = (body.get("usuario") or "").strip().lower()
+    senha = body.get("senha") or ""
+    users = _users()
+    if usuario not in users:
+        return _json({"ok": False, "erro": "Usuário não encontrado."}, 404)
+    if len(senha) < 6:
+        return _json({"ok": False, "erro": "Senha precisa de 6+ caracteres."}, 400)
+    salt = secrets.token_hex(16)
+    users[usuario].update(salt=salt, hash=_hash_senha(senha, salt))
+    _save_users(users)
+    return _json({"ok": True})
+
+
+@app.post("/api/usuarios/remover")
+def api_usuarios_remover():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o administrador pode remover usuários."}, 403)
+    body = request.get_json(force=True, silent=True) or {}
+    usuario = (body.get("usuario") or "").strip().lower()
+    users = _users()
+    if usuario not in users:
+        return _json({"ok": False, "erro": "Usuário não encontrado."}, 404)
+    if usuario == session.get("user"):
+        return _json({"ok": False, "erro": "Você não pode remover a si mesmo."}, 400)
+    admins = [k for k, v in users.items() if v.get("admin")]
+    if users[usuario].get("admin") and len(admins) <= 1:
+        return _json({"ok": False, "erro": "Não dá pra remover o único administrador."}, 400)
+    del users[usuario]
+    _save_users(users)
+    return _json({"ok": True})
+
+
+@app.post("/api/minha-senha")
+def api_minha_senha():
+    if not _logado():
+        return _json({"ok": False, "erro": "Faça login."}, 401)
+    body = request.get_json(force=True, silent=True) or {}
+    atual = body.get("atual") or ""
+    nova = body.get("nova") or ""
+    if not _login_valido(session["user"], atual):
+        return _json({"ok": False, "erro": "Senha atual incorreta."}, 401)
+    if len(nova) < 6:
+        return _json({"ok": False, "erro": "A nova senha precisa de 6+ caracteres."}, 400)
+    users = _users()
+    salt = secrets.token_hex(16)
+    users[session["user"]].update(salt=salt, hash=_hash_senha(nova, salt))
+    _save_users(users)
     return _json({"ok": True})
 
 
