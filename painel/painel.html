@@ -105,7 +105,17 @@
         <small class="dim">Redefinir senha: digite a nova senha na linha do usuário e clique em 🔑. Remover: ✕.</small>
       </div>
       <div class="card">
-        <h2>Novo usuário</h2>
+        <h2>Convidar por link</h2>
+        <p style="margin:0 0 12px;font-size:13px;color:#9aa0ab">Gere um link e mande pra pessoa (WhatsApp, e-mail...). Ela mesma escolhe o usuário e a senha. O link vale <b>7 dias</b> e funciona <b>uma única vez</b>.</p>
+        <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="gerarConvite()">🔗 Gerar link de convite</button>
+        <span id="cv_st" style="font-size:13px;margin-left:10px"></span>
+        <div id="cv_box" style="display:none;gap:8px;margin-top:12px">
+          <input id="cv_url" readonly style="flex:1;font-size:13px">
+          <button type="button" class="addbtn" style="width:auto;padding:9px 14px" onclick="copiarConvite()">📋 Copiar</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Novo usuário (manual)</h2>
         <div class="grid2">
           <label class="field">Usuário (3+ letras)<input id="nu_user" placeholder="ex: labodega"></label>
           <label class="field">Senha (6+ caracteres)<input type="password" id="nu_senha"></label>
@@ -164,6 +174,23 @@ async function carregarUsuarios() {
       <button type="button" class="del" title="Remover usuário" onclick="removerUsuario('${esc(u.usuario)}')">✕</button>`;
     box.appendChild(row);
   });
+}
+
+async function gerarConvite() {
+  const st = el("cv_st"); st.textContent = "gerando..."; st.style.color = "#9aa0ab";
+  const j = await trata(await fetch(API + "/convites", { method:"POST" }));
+  if (j.ok) {
+    st.textContent = "✅ link pronto — copie e mande!"; st.style.color = "#25D366";
+    el("cv_url").value = j.url;
+    el("cv_box").style.display = "flex";
+  } else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
+}
+
+function copiarConvite() {
+  const inp = el("cv_url"); inp.select(); inp.setSelectionRange(0, 999);
+  if (navigator.clipboard) { navigator.clipboard.writeText(inp.value); }
+  else { document.execCommand("copy"); }
+  el("cv_st").textContent = "✅ copiado!"; el("cv_st").style.color = "#25D366";
 }
 
 async function criarUsuario() {

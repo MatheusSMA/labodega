@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Criar acesso — Painel do Restaurante</title>
+<style>
+  * { box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(90% 90% at 50% 15%, #2c2823, #16130f 75%); color:#e8e1d0; padding:24px; }
+  .card { background:#1b1e26; border:1px solid #2f333f; border-radius:18px; padding:34px 30px;
+    width:100%; max-width:380px; box-shadow:0 30px 80px -30px rgba(0,0,0,.7); }
+  h1 { font-size:20px; margin:0 0 4px; text-align:center; }
+  .sub { text-align:center; color:#9aa0ab; font-size:13px; margin-bottom:26px; }
+  label { display:block; font-size:13px; color:#9aa0ab; margin-bottom:12px; }
+  input { width:100%; margin-top:5px; background:#0f1115; border:1px solid #313644; color:#fff;
+    border-radius:9px; padding:11px 12px; font-size:15px; }
+  input:focus { outline:none; border-color:#c89a3e; }
+  button { width:100%; background:#25D366; color:#06210f; font-weight:700; font-size:15px;
+    border:0; border-radius:11px; padding:13px; cursor:pointer; margin-top:6px; }
+  button:hover { filter:brightness(1.08); }
+  #st { display:block; text-align:center; font-size:13px; margin-top:12px; min-height:18px; }
+  .erro-card { text-align:center; }
+  .erro-card .icone { font-size:44px; margin-bottom:14px; }
+  .erro-card p { color:#9aa0ab; font-size:14px; line-height:1.6; }
+  .hidden { display:none; }
+  .hint { font-size:12px; color:#6b717c; margin-top:10px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="form_ok" class="hidden">
+    <h1>🍽️ Criar seu acesso</h1>
+    <div class="sub">Painel do Restaurante — La Bodega</div>
+    <label>Escolha seu usuário (3+ letras)<input type="text" id="usuario" autocomplete="username" placeholder="ex: labodega"></label>
+    <label>Escolha sua senha (6+ caracteres)<input type="password" id="senha" autocomplete="new-password"></label>
+    <label>Repita a senha<input type="password" id="senha2" autocomplete="new-password"></label>
+    <button onclick="criar()">Criar e entrar no painel</button>
+    <span id="st"></span>
+    <div class="hint">Guarde seu usuário e senha — você vai usá-los para entrar no painel.</div>
+  </div>
+
+  <div id="form_invalido" class="erro-card hidden">
+    <div class="icone">⛔</div>
+    <h1>Convite inválido</h1>
+    <p>Este link de convite venceu ou já foi usado.<br>
+       Peça um novo link para o administrador do painel.</p>
+  </div>
+</div>
+
+<script>
+const el = id => document.getElementById(id);
+const CONVITE_OK = "__CONVITE_OK__" === "1";
+const TOKEN = new URLSearchParams(location.search).get("c") || "";
+el(CONVITE_OK ? "form_ok" : "form_invalido").classList.remove("hidden");
+
+function criar() {
+  const st = el("st");
+  if (el("senha").value !== el("senha2").value) {
+    st.textContent = "❌ As senhas não são iguais."; st.style.color = "#ff6b6b"; return;
+  }
+  st.textContent = "criando..."; st.style.color = "#9aa0ab";
+  fetch("api/registro", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ token: TOKEN, usuario: el("usuario").value, senha: el("senha").value }) })
+    .then(r => r.json()).then(j => {
+      if (j.ok) { st.textContent = "✅ Pronto! Entrando..."; st.style.color = "#25D366"; location.href = "./"; }
+      else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
+    }).catch(e => { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; });
+}
+document.addEventListener("keydown", e => { if (e.key === "Enter" && CONVITE_OK) criar(); });
+</script>
+</body>
+</html>

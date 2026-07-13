@@ -727,7 +727,9 @@ def login_page():
         return redirect(url_for("painel"))
     with open(os.path.join(BASE, "login.html"), encoding="utf-8") as f:
         html = f.read()
-    # sem usuário criado ainda? o bloco "primeiro acesso" abre sozinho
+    if _users():
+        # já existe usuário: o bloco "primeiro acesso" some da tela
+        html = re.sub(r"<!--PRIMEIRO-->.*?<!--/PRIMEIRO-->", "", html, flags=re.S)
     return Response(html.replace("__TEM_USUARIOS__", "1" if _users() else "0"),
                     mimetype="text/html")
 
@@ -833,6 +835,72 @@ def api_usuarios_remover():
         return _json({"ok": False, "erro": "Não dá pra remover o único administrador."}, 400)
     del users[usuario]
     _save_users(users)
+    return _json({"ok": True})
+
+
+# ---------------- convites (link de registro) ----------------
+INVITES_FILE = os.path.join(DATA_DIR, "invites.json")
+
+
+def _invites():
+    try:
+        with open(INVITES_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_invites(inv):
+    with open(INVITES_FILE, "w", encoding="utf-8") as f:
+        json.dump(inv, f, indent=2)
+
+
+def _invite_valido(token):
+    inv = _invites().get(token or "")
+    return bool(inv) and not inv.get("usado") and time.time() < inv.get("expira", 0)
+
+
+@app.post("/api/convites")
+def api_convites_criar():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o administrador pode gerar convites."}, 403)
+    # limpa convites usados/vencidos e cria um novo
+    inv = {t: d for t, d in _invites().items()
+           if not d.get("usado") and time.time() < d.get("expira", 0)}
+    token = secrets.token_urlsafe(24)
+    inv[token] = {"criado": time.time(), "expira": time.time() + 7 * 24 * 3600, "usado": False}
+    _save_invites(inv)
+    url = f"https://{request.host}{request.script_root}/registro?c={token}"
+    return _json({"ok": True, "url": url})
+
+
+@app.get("/registro")
+def registro_page():
+    ok = _invite_valido(request.args.get("c", ""))
+    with open(os.path.join(BASE, "registro.html"), encoding="utf-8") as f:
+        html = f.read()
+    return Response(html.replace("__CONVITE_OK__", "1" if ok else "0"),
+                    mimetype="text/html")
+
+
+@app.post("/api/registro")
+def api_registro():
+    body = request.get_json(force=True, silent=True) or {}
+    token = body.get("token") or ""
+    if not _invite_valido(token):
+        return _json({"ok": False, "erro": "Convite inválido, vencido ou já usado. Peça um novo link."}, 401)
+    usuario = (body.get("usuario") or "").strip().lower()
+    senha = body.get("senha") or ""
+    if len(usuario) < 3 or len(senha) < 6:
+        return _json({"ok": False, "erro": "Usuário precisa de 3+ letras e senha de 6+ caracteres."}, 400)
+    if usuario in _users():
+        return _json({"ok": False, "erro": "Esse nome de usuário já existe. Escolha outro."}, 400)
+    _criar_usuario(usuario, senha, admin=False)  # convite cria usuário comum
+    inv = _invites()
+    inv[token]["usado"] = True
+    _save_invites(inv)
+    session.permanent = True
+    session["user"] = usuario
     return _json({"ok": True})
 
 

@@ -38,6 +38,7 @@
   <button onclick="entrar()">Entrar</button>
   <span id="st"></span>
 
+  <!--PRIMEIRO-->
   <details id="primeiro">
     <summary>Primeiro acesso? Criar o usuário do painel</summary>
     <div class="inner">
@@ -49,11 +50,12 @@
       <div class="hint">Só funciona uma vez, enquanto não existe usuário. Depois, é só login normal.</div>
     </div>
   </details>
+  <!--/PRIMEIRO-->
 </div>
 
 <script>
 const el = id => document.getElementById(id);
-if ("__TEM_USUARIOS__" === "0") { el("primeiro").open = true; }
+if ("__TEM_USUARIOS__" === "0" && el("primeiro")) { el("primeiro").open = true; }
 
 function entrar() {
   const st = el("st"); st.textContent = "entrando..."; st.style.color = "#9aa0ab";
