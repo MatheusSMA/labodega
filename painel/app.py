@@ -410,7 +410,11 @@ def render_site(cfg, edit=False):
         html = html.replace(f"@@{k}@@", str(v))
 
     if edit:
-        html = html.replace("</body>", EDITOR_UI + "\n</body>")
+        ui = (EDITOR_UI
+              .replace("__EMBREVE__", "checked" if site.get("emBreve") else "")
+              .replace("__EMBREVE_MSG_DISPLAY__", "inline-block" if site.get("emBreve") else "none")
+              .replace("__EMBREVE_MSG__", (site.get("emBreveMsg") or "").replace('"', "&quot;")))
+        html = html.replace("</body>", ui + "\n</body>")
     return html
 
 
@@ -486,6 +490,12 @@ EDITOR_UI = """
 <div id="cms-hint">🖌️ <b>Modo edição</b><br>Clique num texto para alterar.<br>Clique numa foto para trocar.</div>
 <div id="cms-bar">
   <button onclick="cmsSave()">💾 Salvar alterações</button>
+  <label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;color:#cfd3da;cursor:pointer" title="Esconde o site e mostra só a logo com uma mensagem">
+    <input type="checkbox" id="cms-embreve" __EMBREVE__
+      onchange="document.getElementById('cms-embreve-msg').style.display=this.checked?'inline-block':'none'"> 🚧 Em breve
+  </label>
+  <input type="text" id="cms-embreve-msg" value="__EMBREVE_MSG__" placeholder="mensagem do modo em breve"
+    style="background:#0f1115;border:1px solid #313644;color:#fff;border-radius:8px;padding:8px 10px;font-size:13px;width:220px;display:__EMBREVE_MSG_DISPLAY__">
   <span id="cms-st"></span>
   <a href="./">← voltar ao painel</a>
 </div>
@@ -543,6 +553,8 @@ EDITOR_UI = """
       var k = n.getAttribute("data-key");
       patch[k] = n.getAttribute("data-rich") ? "__RICH__" + n.innerHTML : n.textContent;
     });
+    patch["site.emBreve"] = document.getElementById("cms-embreve").checked;
+    patch["site.emBreveMsg"] = document.getElementById("cms-embreve-msg").value;
     fetch("api/save-visual", {method:"POST",
       headers:{"content-type":"application/json"},
       body: JSON.stringify(patch)})
@@ -571,6 +583,9 @@ def _plain(v):
 
 def _apply_visual(cfg, key, raw):
     """Aplica um campo do editor visual (caminho pontilhado) na config."""
+    if key == "site.emBreve":  # checkbox da barra do editor (booleano)
+        cfg.setdefault("site", {})["emBreve"] = raw is True or str(raw).lower() in ("true", "1")
+        return
     rich = isinstance(raw, str) and raw.startswith("__RICH__")
     v = raw[8:] if rich else str(raw)
     v = _clean_rich(v) if rich else _plain(v)

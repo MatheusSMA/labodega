@@ -41,8 +41,8 @@
   <h1>🍽️ Painel — La Bodega</h1>
   <div class="tabs">
     <button class="tab active" onclick="showTab('bot')" id="tab-bot">Bot</button>
-    <button class="tab" onclick="showTab('site')" id="tab-site">Site</button>
-    <button class="tab" onclick="showTab('users')" id="tab-users">Usuários</button>
+    <button class="tab" onclick="location.href='editor'" id="tab-site">Site ✏️</button>
+    <button class="tab hidden" onclick="showTab('users')" id="tab-users">Usuários</button>
     <a href="logout" style="color:#9aa0ab;font-size:13px;align-self:center;margin-left:8px;text-decoration:none" title="Sair do painel">Sair ⎋</a>
   </div>
 </div>
@@ -95,108 +95,12 @@
     </div>
   </div>
 
-  <div id="pane-site" class="hidden">
-    <div class="card" style="text-align:center">
-      <a href="editor" target="_blank" style="display:inline-block;background:#c89a3e;color:#1b1916;font-weight:700;padding:14px 26px;border-radius:11px;text-decoration:none;font-size:15px">🖌️ Editar o site clicando nos textos</a>
-      <small class="dim" style="display:block;margin-top:10px">Abre o site em modo edição: clique em qualquer texto pra alterar, clique numa foto pra trocar. Salvou, publicou. Os campos abaixo são o modo avançado (mesmas informações).</small>
-    </div>
-    <div class="card">
-      <h2>Disponibilidade do site</h2>
-      <label class="chk"><input type="checkbox" id="s_embreve"> Ativar modo <b>“Em breve”</b> (esconde o site)</label>
-      <small class="dim" style="display:block;margin-top:6px">Ligado: quem visitar o site vê só a logo e a mensagem abaixo. Desligue para voltar ao normal.</small>
-      <label class="field" style="margin-top:12px">Mensagem do “Em breve”<input id="s_embreve_msg"></label>
-    </div>
-
-    <div class="card">
-      <h2>Imagens</h2>
-      <div id="imagens"></div>
-      <small class="dim">A foto troca no site na hora em que o envio termina. Use JPG/PNG/WEBP de até 10&nbsp;MB.</small>
-    </div>
-
-    <div class="card">
-      <h2>Topo do site</h2>
-      <label class="field">Frase principal <small class="dim">(aceita &lt;em&gt; para itálico dourado e &lt;br&gt; para quebra)</small>
-        <textarea id="s_hero_titulo" rows="3"></textarea></label>
-      <label class="field">Subtítulo<input id="s_hero_sub"></label>
-    </div>
-
-    <div class="card">
-      <h2>Seção “A casa”</h2>
-      <label class="field">Frase de destaque <small class="dim">(o trecho entre &lt;span&gt;…&lt;/span&gt; fica dourado)</small>
-        <textarea id="s_quote" rows="2"></textarea></label>
-      <div id="casa_cards"></div>
-    </div>
-
-    <div class="card">
-      <h2>Cardápio — cabeçalho e Menu Executivo</h2>
-      <div class="grid2">
-        <label class="field">Título da seção<input id="s_menu_titulo"></label>
-        <label class="field">Preço do executivo<input id="s_combo_preco" placeholder="R$ 74,90"></label>
-      </div>
-      <label class="field">Texto da seção<textarea id="s_menu_desc" rows="2"></textarea></label>
-      <label class="field">Título do executivo<input id="s_combo_titulo"></label>
-      <div class="grid2">
-        <label class="field">Entradas <small class="dim">(uma por linha)</small><textarea id="s_combo_ent" rows="3"></textarea></label>
-        <label class="field">Principal <small class="dim">(um por linha)</small><textarea id="s_combo_pri" rows="3"></textarea></label>
-      </div>
-      <label class="field">Sobremesas <small class="dim">(uma por linha)</small><textarea id="s_combo_sob" rows="3"></textarea></label>
-      <label class="field">Observação<input id="s_combo_nota"></label>
-      <small class="dim">💡 Os pratos e preços do cardápio vêm da aba <b>Bot</b> — edite lá e os dois (site e bot) atualizam juntos. Abaixo, o subtítulo de cada categoria no site:</small>
-      <div id="menu_subs" style="margin-top:10px"></div>
-    </div>
-
-    <div class="card">
-      <h2>Seção “Pra beber”</h2>
-      <label class="field">Título da seção<input id="s_drink_titulo"></label>
-      <div class="grid2">
-        <label class="field">Nome do combo<input id="s_drink_nome"></label>
-        <label class="field">Preço <small class="dim">(ex: 24,90)</small><input id="s_drink_preco"></label>
-      </div>
-      <label class="field">Descrição<textarea id="s_drink_desc" rows="2"></textarea></label>
-    </div>
-
-    <div class="card">
-      <h2>Endereço, contato e horários</h2>
-      <label class="field">Endereço <small class="dim">(uma linha por linha do site)</small><textarea id="s_endereco" rows="3"></textarea></label>
-      <label class="field">Observação do endereço<input id="s_end_obs"></label>
-      <div class="grid2">
-        <label class="field">Telefone<input id="s_tel"></label>
-        <label class="field">E-mail<input id="s_email"></label>
-      </div>
-      <label class="field">Instagram <small class="dim">(sem @)</small><input id="s_insta"></label>
-      <div style="margin:8px 0 4px;font-size:13px;color:#9aa0ab">Horários mostrados no site:</div>
-      <div id="s_horarios"></div>
-      <button type="button" class="addbtn" onclick="addVrow()">+ Adicionar linha de horário</button>
-      <label class="field" style="margin-top:10px">Observação dos horários<input id="s_hor_obs"></label>
-    </div>
-
-    <div class="card">
-      <h2>Link do atendente e SEO</h2>
-      <label class="field">Link do botão “Falar com a gente” <small class="dim">(Telegram hoje; troque pelo wa.me quando for WhatsApp)</small>
-        <input id="s_bot_link"></label>
-      <div class="grid2">
-        <label class="field">Título da aba do navegador<input id="s_meta_title"></label>
-        <label class="field">Descrição p/ Google<input id="s_meta_desc"></label>
-      </div>
-    </div>
-  </div>
-
   <!-- ================= ABA USUÁRIOS ================= -->
   <div id="pane-users" class="hidden">
-    <div class="card">
-      <h2>Minha conta</h2>
-      <p style="margin:0 0 12px;font-size:14px">Conectado como <b id="me_user">…</b> <span id="me_badge"></span></p>
-      <div class="grid2">
-        <label class="field">Senha atual<input type="password" id="ms_atual"></label>
-        <label class="field">Nova senha (6+)<input type="password" id="ms_nova"></label>
-      </div>
-      <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="trocarMinhaSenha()">🔑 Trocar minha senha</button>
-      <span id="ms_st" style="font-size:13px;margin-left:10px"></span>
-    </div>
-
     <div id="admin_users" class="hidden">
       <div class="card">
         <h2>Usuários do painel</h2>
+        <p style="margin:0 0 12px;font-size:13px;color:#9aa0ab">Conectado como <b id="me_user">…</b></p>
         <div id="lista_users"></div>
         <small class="dim">Redefinir senha: digite a nova senha na linha do usuário e clique em 🔑. Remover: ✕.</small>
       </div>
@@ -228,7 +132,7 @@ const el = id => document.getElementById(id);
 const esc = s => (s||"").replace(/"/g,"&quot;");
 
 function showTab(t) {
-  ["bot","site","users"].forEach(x => {
+  ["bot","users"].forEach(x => {
     el("pane-"+x).classList.toggle("hidden", t!==x);
     el("tab-"+x).classList.toggle("active", t===x);
   });
@@ -239,9 +143,12 @@ async function carregarMe() {
   try {
     const me = await trata(await fetch(API + "/me"));
     if (!me.ok) return;
-    el("me_user").textContent = me.usuario;
-    el("me_badge").innerHTML = me.admin ? '<span style="color:#c89a3e">· administrador</span>' : "";
-    if (me.admin) { el("admin_users").classList.remove("hidden"); carregarUsuarios(); }
+    if (me.admin) {
+      el("tab-users").classList.remove("hidden");
+      el("admin_users").classList.remove("hidden");
+      el("me_user").textContent = me.usuario;
+      carregarUsuarios();
+    }
   } catch (e) {}
 }
 
@@ -283,13 +190,6 @@ async function removerUsuario(usuario) {
   carregarUsuarios();
 }
 
-async function trocarMinhaSenha() {
-  const st = el("ms_st"); st.textContent = "trocando..."; st.style.color = "#9aa0ab";
-  const j = await trata(await fetch(API + "/minha-senha", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ atual: el("ms_atual").value, nova: el("ms_nova").value }) }));
-  if (j.ok) { st.textContent = "✅ senha trocada!"; st.style.color = "#25D366"; el("ms_atual").value=""; el("ms_nova").value=""; }
-  else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
-}
 function trata(res) {
   if (res.status === 401) { location.href = "login"; throw new Error("sem login"); }
   return res.json();
@@ -340,130 +240,6 @@ function fillForm(b) {
   el("cardapio").innerHTML = ""; (b.cardapio||[]).forEach(addCard);
   el("faq").innerHTML = ""; (b.faq||[]).forEach(addFaq);
 }
-// ================= ABA SITE =================
-let SITE = {};  // último site carregado (preserva img e campos não editados)
-
-const SLOTS = [["logo","Logo (redonda)"],["hero","Foto do topo"],["drinks","Foto “Pra beber”"]];
-
-function fillImagens() {
-  const box = el("imagens"); box.innerHTML = "";
-  const img = (SITE.img)||{};
-  SLOTS.forEach(([slot,label]) => {
-    const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap";
-    row.innerHTML = `<img src="${img[slot]||""}" alt="" style="width:56px;height:42px;object-fit:cover;border-radius:8px;background:#0f1115;border:1px solid #313644">
-      <span style="width:130px;font-size:13px;color:#9aa0ab">${label}</span>
-      <input type="file" accept="image/*" class="upfile" data-slot="${slot}" style="flex:1;min-width:160px">
-      <button type="button" class="addbtn" style="width:auto;padding:8px 14px" onclick="enviarImg('${slot}', this)">⬆ Enviar</button>
-      <span class="upst" data-slot="${slot}" style="font-size:12px"></span>`;
-    box.appendChild(row);
-  });
-}
-
-async function enviarImg(slot, btn) {
-  const input = document.querySelector(`.upfile[data-slot="${slot}"]`);
-  const st = document.querySelector(`.upst[data-slot="${slot}"]`);
-  if (!input.files[0]) { st.textContent = "escolha um arquivo"; st.style.color = "#ffb454"; return; }
-  st.textContent = "enviando..."; st.style.color = "#9aa0ab";
-  const fd = new FormData(); fd.append("arquivo", input.files[0]);
-  try {
-    const res = await fetch(API + "/upload/" + slot, { method:"POST", body: fd });
-    const j = await trata(res);
-    if (j.ok) {
-      st.textContent = "✅ trocada no site!"; st.style.color = "#25D366";
-      SITE.img = SITE.img||{}; SITE.img[slot] = j.path;
-      fillImagens();
-    } else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
-  } catch (e) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; }
-}
-
-function addVrow(r=["",""]) {
-  const row = document.createElement("div"); row.className = "frow";
-  row.innerHTML = `<input class="v_l" placeholder="Ex: Segunda a sábado" value="${esc(r[0])}">
-    <input class="v_v" placeholder="Ex: 10h — 22h" value="${esc(r[1])}">
-    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
-  el("s_horarios").appendChild(row);
-}
-
-function fillMenuSubs() {
-  const box = el("menu_subs"); box.innerHTML = "";
-  const subs = (SITE.menu && SITE.menu.subs) || {};
-  const cats = [...new Set([...document.querySelectorAll(".c_cat")].map(i=>i.value.trim()).filter(Boolean))];
-  cats.forEach(cat => {
-    const lab = document.createElement("label"); lab.className = "field";
-    lab.innerHTML = `Subtítulo de “${esc(cat)}”<input class="msub" data-cat="${esc(cat)}" value="${esc(subs[cat]||"")}">`;
-    box.appendChild(lab);
-  });
-}
-
-function fillSiteTab(s) {
-  SITE = s || {};
-  el("s_embreve").checked = !!SITE.emBreve;
-  el("s_embreve_msg").value = SITE.emBreveMsg||"";
-  fillImagens();
-  const h = SITE.hero||{}; el("s_hero_titulo").value = h.titulo||""; el("s_hero_sub").value = h.sub||"";
-  const c = SITE.casa||{}; el("s_quote").value = c.quote||"";
-  const cardsBox = el("casa_cards"); cardsBox.innerHTML = "";
-  (c.cards||[{},{},{}]).slice(0,3).forEach((cd,i) => {
-    const div = document.createElement("div"); div.className = "grid2"; div.style.marginBottom = "8px";
-    div.innerHTML = `<label class="field">Card ${i+1} — título<input class="cc_t" value="${esc(cd.t)}"></label>
-      <label class="field">Card ${i+1} — texto<input class="cc_d" value="${esc(cd.d)}"></label>`;
-    cardsBox.appendChild(div);
-  });
-  const m = SITE.menu||{}; el("s_menu_titulo").value = m.titulo||""; el("s_menu_desc").value = m.desc||"";
-  const co = SITE.combo||{};
-  el("s_combo_titulo").value = co.titulo||""; el("s_combo_preco").value = co.preco||"";
-  el("s_combo_ent").value = co.entradas||""; el("s_combo_pri").value = co.principal||"";
-  el("s_combo_sob").value = co.sobremesas||""; el("s_combo_nota").value = co.nota||"";
-  fillMenuSubs();
-  const d = SITE.drink||{};
-  el("s_drink_titulo").value = d.titulo||""; el("s_drink_nome").value = d.nome||"";
-  el("s_drink_preco").value = d.preco||""; el("s_drink_desc").value = d.desc||"";
-  const v = SITE.visita||{};
-  el("s_endereco").value = v.endereco||""; el("s_end_obs").value = v.obs_endereco||"";
-  el("s_hor_obs").value = v.obs_horario||"";
-  el("s_horarios").innerHTML = ""; (v.horarios||[]).forEach(addVrow);
-  const ct = SITE.contato||{};
-  el("s_tel").value = ct.tel||""; el("s_email").value = ct.email||""; el("s_insta").value = ct.insta||"";
-  el("s_bot_link").value = SITE.bot_link||"";
-  el("s_meta_title").value = SITE.meta_title||""; el("s_meta_desc").value = SITE.meta_desc||"";
-}
-
-function collectSite() {
-  const cards = [...document.querySelectorAll("#casa_cards .grid2")].map(div => ({
-    t: div.querySelector(".cc_t").value.trim(), d: div.querySelector(".cc_d").value.trim() }));
-  const subs = {};
-  document.querySelectorAll(".msub").forEach(i => { if (i.value.trim()) subs[i.dataset.cat] = i.value.trim(); });
-  // parte de SITE (ex: "textos" do editor visual) que o formulário não cobre: preserva
-  return Object.assign(JSON.parse(JSON.stringify(SITE||{})), {
-    emBreve: el("s_embreve").checked,
-    emBreveMsg: el("s_embreve_msg").value.trim(),
-    meta_title: el("s_meta_title").value.trim(),
-    meta_desc: el("s_meta_desc").value.trim(),
-    hero: { titulo: el("s_hero_titulo").value.trim(), sub: el("s_hero_sub").value.trim() },
-    casa: { quote: el("s_quote").value.trim(), cards },
-    menu: { titulo: el("s_menu_titulo").value.trim(), desc: el("s_menu_desc").value.trim(), subs },
-    combo: {
-      titulo: el("s_combo_titulo").value.trim(), preco: el("s_combo_preco").value.trim(),
-      sub: (SITE.combo && SITE.combo.sub) || "Escolha 1 de cada",
-      entradas: el("s_combo_ent").value, principal: el("s_combo_pri").value,
-      sobremesas: el("s_combo_sob").value, nota: el("s_combo_nota").value.trim(),
-    },
-    drink: { titulo: el("s_drink_titulo").value.trim(), nome: el("s_drink_nome").value.trim(),
-             desc: el("s_drink_desc").value.trim(), preco: el("s_drink_preco").value.trim() },
-    visita: {
-      endereco: el("s_endereco").value, obs_endereco: el("s_end_obs").value.trim(),
-      horarios: [...document.querySelectorAll("#s_horarios .frow")].map(r =>
-        [r.querySelector(".v_l").value.trim(), r.querySelector(".v_v").value.trim()])
-        .filter(r => r[0] || r[1]),
-      obs_horario: el("s_hor_obs").value.trim(),
-    },
-    contato: { tel: el("s_tel").value.trim(), email: el("s_email").value.trim(), insta: el("s_insta").value.trim().replace(/^@/,"") },
-    bot_link: el("s_bot_link").value.trim(),
-    img: SITE.img || {},
-  });
-}
-
 function collectBot() {
   const horarios = {};
   DIAS.forEach(([k]) => { horarios[k] = {
@@ -487,7 +263,7 @@ function collectBot() {
 async function salvar() {
   const st = el("status"); st.textContent = "Salvando..."; st.style.color = "#9aa0ab";
   try {
-    const res = await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ bot: collectBot(), site: collectSite() }) });
+    const res = await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ bot: collectBot() }) });
     const j = await trata(res);
     if (j.ok && j.publicado) { st.textContent = "✅ Salvo e site atualizado!"; st.style.color = "#25D366"; }
     else if (j.ok) { st.textContent = "⚠ Salvo, mas o site não publicou: " + (j.msg||""); st.style.color = "#ffb454"; }
@@ -498,7 +274,6 @@ async function salvar() {
   try {
     const cfg = await (await fetch(API + "/config")).json();
     fillForm(cfg.bot || {});
-    fillSiteTab(cfg.site || {});
     carregarMe();
   } catch (e) { el("status").textContent = "Erro ao carregar: " + e; }
 })();
