@@ -127,7 +127,9 @@ DEFAULT_SITE = {
     },
     "contato": {"tel": "(24) 2017-9899", "email": "labodegapetropolis@gmail.com", "insta": "labodegapetropolis"},
     "bot_link": "https://t.me/labodegapatio_bot?start=qr",
-    "img": {"logo": "/img/logo.png", "hero": "/img/hero-bg.jpg", "drinks": "/img/drinks.jpg"},
+    "img": {"logo": "/img/logo.png", "hero": "/img/hero-bg.jpg", "drinks": "/img/drinks.jpg",
+            "g1": "/img/hero-bg.jpg", "g2": "/img/drinks.jpg",
+            "g3": "/img/hero-bg.jpg", "g4": "/img/drinks.jpg"},
     # Textos menores espalhados pelo site (títulos de seção, botões, rótulos)
     "textos": {
         "eyebrow_menu": "O cardápio",
@@ -162,11 +164,42 @@ DEFAULT_SITE = {
         "nav_cardapio": "Cardápio",
         "nav_drinks": "Pra beber",
         "nav_visite": "Visite",
+        "nav_reservas": "Reservas",
         "foot_visita": "Onde estamos",
         "foot_h_nav": "Navegação",
         "foot_h_contato": "Contato",
         "foot_h_endereco": "Endereço",
+        # --- seção Vinhos & bebidas ---
+        "eyebrow_beb": "Vinhos & bebidas",
+        "beb_h2": "Da adega ao chopp",
+        "beb_desc": "Uma carta pensada pra acompanhar a cozinha — e o fim de tarde no rooftop.",
+        "beb1_t": "Vinhos",
+        "beb1_d": "Rótulos selecionados, da taça à garrafa. Peça uma sugestão de harmonização com o seu prato.",
+        "beb2_t": "Drinks & coquetéis",
+        "beb2_d": "Clássicos e autorais preparados na hora: gin tônica, aperol e caipirinhas de frutas frescas.",
+        "beb3_t": "Chopp & cervejas",
+        "beb3_d": "Chopp Brahma tirado no capricho e cervejas geladas pra todo gosto.",
+        # --- seção Reservas ---
+        "eyebrow_res": "Reservas",
+        "res_h2": "Reserve sua mesa",
+        "res_txt": "Aceitamos reservas para grupos e ocasiões especiais. Recomendamos reservar com pelo menos 2 horas de antecedência — e, para grupos grandes, com 1 dia.",
+        "res_btn": "Reservar pelo atendente",
+        "res_obs": "Prefere falar com alguém? Liga pra gente:",
+        # --- seção Eventos ---
+        "eyebrow_evt": "Eventos",
+        "evt_h2": "Degustações & encontros",
+        "evt_txt": "O La Bodega recebe degustações de vinhos, jantares harmonizados e eventos especiais no rooftop.",
+        "evt_card_t": "Próximos eventos",
+        "evt_card_d": "As datas saem primeiro no nosso Instagram — acompanhe por lá ou pergunte ao nosso atendente.",
+        "evt_btn": "Ver a agenda no Instagram",
+        # --- seção Siga a gente ---
+        "eyebrow_social": "Redes sociais",
+        "social_h2": "Siga a gente",
+        "social_desc": "Bastidores, pratos novos e eventos — tudo primeiro no Instagram.",
+        "social_btn": "Seguir no Instagram",
+        "reviews_txt": "⭐ Avalie a gente no Google",
     },
+    "reviews_link": "https://www.google.com/maps/search/?api=1&query=La+Bodega+P%C3%A1tio+Petr%C3%B3polis+Rua+Marechal+Deodoro+153",
 }
 
 # textos com formatação leve permitida no editor visual
@@ -340,14 +373,26 @@ def render_site(cfg, edit=False):
     preco_drink = (site["drink"].get("preco") or "0,00").replace("R$", "").strip()
     d_int, _, d_cents = preco_drink.partition(",")
     endereco_lines = [l.strip() for l in (site["visita"].get("endereco") or "").splitlines() if l.strip()]
+    # link do bot que já abre no fluxo de reserva (deep link ?start=reserva)
+    bot_link = site["bot_link"]
+    if "start=" in bot_link:
+        link_reserva = re.sub(r"start=[^&]*", "start=reserva", bot_link)
+    else:
+        link_reserva = bot_link + ("&" if "?" in bot_link else "?") + "start=reserva"
     valores = {
         "META_TITLE": site["meta_title"],
         "META_DESC": site["meta_desc"],
         "NOME": bot.get("nome", "La Bodega"),
         "LINK_BOT": site["bot_link"],
+        "LINK_BOT_RESERVA": link_reserva,
+        "LINK_REVIEWS": site.get("reviews_link", ""),
         "IMG_LOGO": site["img"].get("logo", "/img/logo.png"),
         "IMG_HERO": site["img"].get("hero", "/img/hero-bg.jpg"),
         "IMG_DRINKS": site["img"].get("drinks", "/img/drinks.jpg"),
+        "IMG_G1": site["img"].get("g1", "/img/hero-bg.jpg"),
+        "IMG_G2": site["img"].get("g2", "/img/drinks.jpg"),
+        "IMG_G3": site["img"].get("g3", "/img/hero-bg.jpg"),
+        "IMG_G4": site["img"].get("g4", "/img/drinks.jpg"),
         "HERO_TITULO": site["hero"]["titulo"],
         "HERO_SUB": site["hero"]["sub"],
         "CASA_QUOTE": site["casa"]["quote"],
@@ -389,6 +434,9 @@ def render_site(cfg, edit=False):
         html = html.replace('src="@@IMG_LOGO@@"', f'src="{valores["IMG_LOGO"]}" data-cms-img="logo" title="Clique para trocar a logo"')
         html = html.replace('src="@@IMG_HERO@@"', f'src="{valores["IMG_HERO"]}" data-cms-img="hero" title="Clique para trocar a foto do topo"')
         html = html.replace('src="@@IMG_DRINKS@@"', f'src="{valores["IMG_DRINKS"]}" data-cms-img="drinks" title="Clique para trocar a foto"')
+        for g in ("g1", "g2", "g3", "g4"):
+            html = html.replace(f'src="@@IMG_{g.upper()}@@"',
+                                f'src="{valores["IMG_" + g.upper()]}" data-cms-img="{g}" title="Clique para trocar a foto"')
         # marcadores dentro de atributos não podem virar <span>: resolve antes
         html = html.replace("mailto:@@EMAIL@@", "mailto:" + valores["EMAIL"])
         html = html.replace("https://instagram.com/@@INSTA@@", "https://instagram.com/" + valores["INSTA"])
@@ -993,7 +1041,7 @@ def api_publish():
 
 
 ALLOWED_EXT = {"jpg", "jpeg", "png", "webp"}
-SLOTS = {"logo", "hero", "drinks"}
+SLOTS = {"logo", "hero", "drinks", "g1", "g2", "g3", "g4"}
 
 
 @app.post("/api/upload/<slot>")
