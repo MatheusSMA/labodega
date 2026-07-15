@@ -79,6 +79,7 @@ DEFAULT_BOT = {
 DEFAULT_SITE = {
     "emBreve": False,
     "emBreveMsg": "Estamos preparando algo especial. Volte logo!",
+    "preview_slug": "teste01",  # URL da prévia: dominio.com.br/teste01
     "meta_title": "La Bodega · Rooftop · Pátio Petrópolis",
     "meta_desc": "O rooftop mais charmoso de Petrópolis. Cozinha autoral, do almoço ao happy hour, no Pátio Petrópolis Shopping. Veja o cardápio e fale com a gente no Telegram.",
     "hero": {
@@ -413,7 +414,8 @@ def render_site(cfg, edit=False):
         ui = (EDITOR_UI
               .replace("__EMBREVE__", "checked" if site.get("emBreve") else "")
               .replace("__EMBREVE_MSG_DISPLAY__", "inline-block" if site.get("emBreve") else "none")
-              .replace("__EMBREVE_MSG__", (site.get("emBreveMsg") or "").replace('"', "&quot;")))
+              .replace("__EMBREVE_MSG__", (site.get("emBreveMsg") or "").replace('"', "&quot;"))
+              .replace("__PREVIEW_URL__", "/" + _preview_slug(site)))
         html = html.replace("</body>", ui + "\n</body>")
     return html
 
@@ -448,17 +450,32 @@ def render_embreve(cfg):
 </body></html>"""
 
 
+def _preview_slug(site):
+    slug = re.sub(r"[^a-z0-9_-]", "", (site.get("preview_slug") or "teste01").lower())
+    return slug or "teste01"
+
+
 def publish_site(cfg):
-    """Gera e grava o index.html no public_html. Retorna (ok, msg)."""
+    """Gera e grava o site no public_html: o principal (respeita o modo
+    'Em breve') e a PRÉVIA sempre completa em /<preview_slug>/ (com noindex).
+    Retorna (ok, msg)."""
     if not os.path.isdir(PUBLIC_HTML):
         return False, f"pasta do site não encontrada ({PUBLIC_HTML})"
     site = cfg.get("site") or {}
-    html = render_embreve(cfg) if site.get("emBreve") else render_site(cfg)
-    if "@@" in html:
-        sobras = sorted(set(re.findall(r"@@[A-Z0-9_]+@@", html)))
+    completo = render_site(cfg)
+    if "@@" in completo:
+        sobras = sorted(set(re.findall(r"@@[A-Z0-9_]+@@", completo)))
         return False, "marcadores sem valor: " + ", ".join(sobras[:5])
+    principal = render_embreve(cfg) if site.get("emBreve") else completo
     with open(os.path.join(PUBLIC_HTML, "index.html"), "w", encoding="utf-8") as f:
-        f.write(html)
+        f.write(principal)
+    # prévia: site completo num caminho reservado, invisível pra buscadores
+    prev_dir = os.path.join(PUBLIC_HTML, _preview_slug(site))
+    os.makedirs(prev_dir, exist_ok=True)
+    preview = completo.replace(
+        "</head>", '<meta name="robots" content="noindex,nofollow">\n</head>', 1)
+    with open(os.path.join(prev_dir, "index.html"), "w", encoding="utf-8") as f:
+        f.write(preview)
     return True, "site publicado"
 
 
@@ -497,6 +514,7 @@ EDITOR_UI = """
   <input type="text" id="cms-embreve-msg" value="__EMBREVE_MSG__" placeholder="mensagem do modo em breve"
     style="background:#0f1115;border:1px solid #313644;color:#fff;border-radius:8px;padding:8px 10px;font-size:13px;width:220px;display:__EMBREVE_MSG_DISPLAY__">
   <span id="cms-st"></span>
+  <a href="__PREVIEW_URL__" target="_blank" rel="noopener" title="Abre a versão de teste do site (sempre completa, mesmo com Em breve ligado)">🔍 prévia</a>
   <a href="./">← voltar ao painel</a>
 </div>
 <input type="file" id="cms-file" accept="image/*" style="display:none">
