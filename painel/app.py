@@ -337,8 +337,9 @@ def _menu_cols(cardapio, subs, edit=False, videos=None):
                 d = f'<span data-key="bot.cardapio.{idx}.desc">{desc}</span>' if edit else desc
                 linha += f'<p class="item-desc">{d}</p>'
             if video:
-                linha += (f'<div class="video-wrap"><video src="{video}" muted loop '
-                          f'playsinline preload="none"></video></div>')
+                linha += (f'<div class="video-wrap">'
+                          f'<video src="{video}" muted loop playsinline preload="none"></video>'
+                          f'<div class="dica">clique para ver em tela cheia</div></div>')
             linha += "</div>"
             parts.append(linha)
         parts.append("      </div>")
@@ -554,63 +555,103 @@ VIDEO_UI = """
 <style>
   .item.com-video{cursor:pointer}
   .item.com-video .item-name{display:inline-block;transform-origin:left center;
-    transition:transform .32s cubic-bezier(.2,.7,.2,1),color .32s}
+    transition:transform .55s cubic-bezier(.2,.7,.2,1),color .55s}
   .item.com-video .item-name::after{content:"▸";margin-left:8px;font-size:.72em;
-    color:var(--gold);opacity:.55;transition:opacity .3s,transform .32s;display:inline-block}
+    color:var(--gold);opacity:.55;transition:opacity .5s,transform .55s;display:inline-block}
   .item.com-video:hover .item-name,.item.com-video.aberto .item-name{
-    transform:scale(1.07);color:var(--gold-soft)}
+    transform:scale(1.06);color:var(--gold-soft)}
   .item.com-video:hover .item-name::after,.item.com-video.aberto .item-name::after{
     opacity:1;transform:rotate(90deg)}
-  .item.com-video .item-desc{transition:color .3s}
+  .item.com-video .item-desc{transition:color .5s}
   .item.com-video:hover .item-desc,.item.com-video.aberto .item-desc{color:var(--cream)}
+
+  /* previa: largura da linha do prato, video inteiro, centralizado */
   .video-wrap{max-height:0;opacity:0;overflow:hidden;
-    transition:max-height .5s cubic-bezier(.2,.7,.2,1),opacity .35s ease,margin-top .5s}
+    transition:max-height .85s cubic-bezier(.22,.68,.24,1),opacity .6s ease,margin-top .85s}
   .item.com-video:hover .video-wrap,.item.com-video.aberto .video-wrap{
     max-height:300px;opacity:1;margin-top:14px}
-  .video-wrap video{width:160px;max-width:52vw;aspect-ratio:9/16;object-fit:cover;
-    border-radius:12px;display:block;background:var(--ink-3);
-    box-shadow:0 18px 40px -18px rgba(0,0,0,.9),0 0 0 1px var(--line-strong)}
+  .video-wrap video{width:100%;height:260px;object-fit:contain;display:block;
+    background:#000;border-radius:12px;box-shadow:0 18px 40px -18px rgba(0,0,0,.9),
+    0 0 0 1px var(--line-strong)}
+  .video-wrap .dica{margin-top:7px;font-size:.72rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--cream-dim);text-align:center}
+
+  /* tela cheia */
+  #cinema{position:fixed;inset:0;z-index:200;display:flex;align-items:center;
+    justify-content:center;padding:24px;background:rgba(8,7,6,.92);
+    backdrop-filter:blur(6px);opacity:0;visibility:hidden;
+    transition:opacity .45s ease,visibility .45s}
+  #cinema.on{opacity:1;visibility:visible}
+  #cinema video{max-width:min(92vw,520px);max-height:86vh;border-radius:14px;
+    background:#000;box-shadow:0 40px 90px -30px rgba(0,0,0,.95);
+    transform:scale(.9);opacity:0;transition:transform .5s cubic-bezier(.2,.8,.25,1),opacity .45s}
+  #cinema.on video{transform:scale(1);opacity:1}
+  #cinema .fechar{position:absolute;top:18px;right:20px;width:46px;height:46px;
+    border-radius:50%;border:1px solid var(--line-strong);background:rgba(0,0,0,.45);
+    color:var(--cream);font-size:1.5rem;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:background .25s,transform .25s}
+  #cinema .fechar:hover{background:var(--gold);color:var(--ink);transform:rotate(90deg)}
   @media(hover:none){
     .item.com-video .item-name::after{content:"▸ ver";font-size:.6em;letter-spacing:.06em;
       opacity:.75;transform:none}
-    .item.com-video.aberto .item-name::after{content:"▾ fechar";transform:none}
+    .item.com-video.aberto .item-name::after{content:"▸ ver";transform:none}
+    .video-wrap .dica{display:none}
   }
   @media(prefers-reduced-motion:reduce){
-    .item.com-video .item-name,.video-wrap{transition:none}
+    .item.com-video .item-name,.video-wrap,#cinema,#cinema video{transition:none}
   }
 </style>
 <script>
 (function(){
   var podeHover = window.matchMedia("(hover:hover) and (pointer:fine)").matches;
   var itens = document.querySelectorAll(".item.com-video");
+  if(!itens.length) return;
 
-  function abrir(it){
-    var v = it.querySelector("video");
+  // camada de tela cheia, criada uma vez
+  var cinema = document.createElement("div");
+  cinema.id = "cinema";
+  cinema.innerHTML = '<button class="fechar" aria-label="Fechar">×</button>' +
+                     '<video playsinline controls loop></video>';
+  document.body.appendChild(cinema);
+  var telao = cinema.querySelector("video");
+
+  function tocar(v){ var p = v.play(); if(p && p.catch) p.catch(function(){}); }
+  function previa(it, ligar){
+    var v = it.querySelector(".video-wrap video");
     if(!v) return;
-    var p = v.play();
-    if(p && p.catch) p.catch(function(){});
+    if(ligar) tocar(v); else { v.pause(); v.currentTime = 0; }
   }
-  function fechar(it){
-    var v = it.querySelector("video");
-    if(!v) return;
-    v.pause(); v.currentTime = 0;
+  function abrirCinema(src){
+    itens.forEach(function(o){ previa(o, false); });
+    telao.src = src;
+    cinema.classList.add("on");
+    document.body.style.overflow = "hidden";
+    tocar(telao);
   }
+  function fecharCinema(){
+    cinema.classList.remove("on");
+    document.body.style.overflow = "";
+    telao.pause();
+    setTimeout(function(){ if(!cinema.classList.contains("on")) telao.removeAttribute("src"); }, 500);
+  }
+
+  cinema.addEventListener("click", function(e){
+    if(e.target === cinema || e.target.classList.contains("fechar")) fecharCinema();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && cinema.classList.contains("on")) fecharCinema();
+  });
 
   itens.forEach(function(it){
+    var v = it.querySelector(".video-wrap video");
+    if(!v) return;
     if(podeHover){
-      it.addEventListener("mouseenter", function(){ abrir(it); });
-      it.addEventListener("mouseleave", function(){ fechar(it); });
+      it.addEventListener("mouseenter", function(){ previa(it, true); });
+      it.addEventListener("mouseleave", function(){ previa(it, false); });
     }
-    // toque (celular) e clique tambem alternam, para quem preferir fixar aberto
     it.addEventListener("click", function(){
-      var jaAberto = it.classList.contains("aberto");
-      itens.forEach(function(o){
-        if(o !== it && o.classList.contains("aberto")){
-          o.classList.remove("aberto"); fechar(o);
-        }
-      });
-      if(jaAberto){ it.classList.remove("aberto"); fechar(it); }
-      else{ it.classList.add("aberto"); abrir(it); }
+      // no celular a primeira toque ja abre em tela cheia
+      abrirCinema(v.getAttribute("src"));
     });
   });
 })();
