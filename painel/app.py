@@ -337,8 +337,10 @@ def _menu_cols(cardapio, subs, edit=False, videos=None):
                 d = f'<span data-key="bot.cardapio.{idx}.desc">{desc}</span>' if edit else desc
                 linha += f'<p class="item-desc">{d}</p>'
             if video:
+                capa = re.sub(r"\.[a-z0-9]+$", ".jpg", video, flags=re.I)
                 linha += (f'<div class="video-wrap">'
-                          f'<video src="{video}" muted loop playsinline preload="none"></video>'
+                          f'<video src="{video}" poster="{capa}" muted loop playsinline '
+                          f'preload="none"></video>'
                           f'<div class="dica">clique para ver em tela cheia</div></div>')
             linha += "</div>"
             parts.append(linha)
@@ -558,18 +560,19 @@ VIDEO_UI = """
     transition:transform .55s cubic-bezier(.2,.7,.2,1),color .55s}
   .item.com-video .item-name::after{content:"▸";margin-left:8px;font-size:.72em;
     color:var(--gold);opacity:.55;transition:opacity .5s,transform .55s;display:inline-block}
-  .item.com-video:hover .item-name,.item.com-video.aberto .item-name{
-    transform:scale(1.06);color:var(--gold-soft)}
-  .item.com-video:hover .item-name::after,.item.com-video.aberto .item-name::after{
-    opacity:1;transform:rotate(90deg)}
   .item.com-video .item-desc{transition:color .5s}
-  .item.com-video:hover .item-desc,.item.com-video.aberto .item-desc{color:var(--cream)}
+  @media(hover:hover) and (pointer:fine){
+    .item.com-video:hover .item-name{transform:scale(1.06);color:var(--gold-soft)}
+    .item.com-video:hover .item-name::after{opacity:1;transform:rotate(90deg)}
+    .item.com-video:hover .item-desc{color:var(--cream)}
+  }
 
   /* previa: largura da linha do prato, video inteiro, centralizado */
   .video-wrap{max-height:0;opacity:0;overflow:hidden;
     transition:max-height .85s cubic-bezier(.22,.68,.24,1),opacity .6s ease,margin-top .85s}
-  .item.com-video:hover .video-wrap,.item.com-video.aberto .video-wrap{
-    max-height:300px;opacity:1;margin-top:14px}
+  @media(hover:hover) and (pointer:fine){
+    .item.com-video:hover .video-wrap{max-height:300px;opacity:1;margin-top:14px}
+  }
   .video-wrap video{width:100%;height:260px;object-fit:contain;display:block;
     background:#000;border-radius:12px;box-shadow:0 18px 40px -18px rgba(0,0,0,.9),
     0 0 0 1px var(--line-strong)}
