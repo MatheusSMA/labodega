@@ -19,8 +19,11 @@ ANTES=$(git rev-parse HEAD)
 git pull -q origin main || exit 0
 DEPOIS=$(git rev-parse HEAD)
 
-# nada novo: encerra em silencio para nao poluir o log
-[ "$ANTES" = "$DEPOIS" ] && exit 0
+# Sai em silencio so quando nao ha commit novo E o que esta publicado ja bate
+# com o repositorio. Assim o script tambem conserta um deploy feito pela metade.
+if [ "$ANTES" = "$DEPOIS" ]    && cmp -s painel/app.py "$PAINEL/app.py"    && cmp -s painel/site_template.html "$PAINEL/site_template.html"; then
+  exit 0
+fi
 
 echo "[$(date '+%Y-%m-%d %H:%M')] deploy $ANTES -> $DEPOIS"
 
