@@ -6,6 +6,8 @@ deployment:
     - export DEPLOYPATH=/home/labodegapetropol/public_html
     - /bin/mkdir -p $DEPLOYPATH/img
     - /bin/cp -f public/img/* $DEPLOYPATH/img/
+    - /bin/mkdir -p $DEPLOYPATH/video
+    - /bin/cp -f public/video/* $DEPLOYPATH/video/
     # ---- Painel (app Python) — data/ é preservado ----
     - export PANELPATH=/home/labodegapetropol/painel
     - /bin/cp -f painel/passenger_wsgi.py $PANELPATH/

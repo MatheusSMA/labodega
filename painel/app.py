@@ -200,6 +200,14 @@ DEFAULT_SITE = {
         "reviews_txt": "⭐ Avalie a gente no Google",
     },
     "reviews_link": "https://www.google.com/maps/search/?api=1&query=La+Bodega+P%C3%A1tio+Petr%C3%B3polis+Rua+Marechal+Deodoro+153",
+    # Vídeo por prato: nome exato do item -> arquivo em /video/.
+    # A prévia (/teste01) sempre mostra; o site principal só com videos_ativos=True.
+    "videos_ativos": False,
+    "videos": {
+        "Frango com Caesar": "/video/frango-trigo.mp4",
+        "Picadinho carioca": "/video/frango-trigo.mp4",
+        "Risoto caprese": "/video/frango-trigo.mp4",
+    },
 }
 
 # textos com formatação leve permitida no editor visual
@@ -290,7 +298,7 @@ def _esc(s):
     return str(s or "")
 
 
-def _menu_cols(cardapio, subs, edit=False):
+def _menu_cols(cardapio, subs, edit=False, videos=None):
     grupos, ordem = {}, []
     for idx, it in enumerate(cardapio or []):
         cat = it.get("categoria") or "Outros"
@@ -319,13 +327,18 @@ def _menu_cols(cardapio, subs, edit=False):
             if edit:
                 preco = f'<span data-key="bot.cardapio.{idx}.preco">{preco}</span>'
             desc = _esc(it.get("desc"))
-            linha = (f'        <div class="item"><div class="item-row">'
+            video = (videos or {}).get(it.get("nome", ""))
+            cls = "item com-video" if video else "item"
+            linha = (f'        <div class="{cls}"><div class="item-row">'
                      f'<span class="item-name">{nome}</span>'
                      f'<span class="item-lead"></span>'
                      f'<span class="item-price">{preco}</span></div>')
             if desc:
                 d = f'<span data-key="bot.cardapio.{idx}.desc">{desc}</span>' if edit else desc
                 linha += f'<p class="item-desc">{d}</p>'
+            if video:
+                linha += (f'<div class="video-wrap"><video src="{video}" muted loop '
+                          f'playsinline preload="none"></video></div>')
             linha += "</div>"
             parts.append(linha)
         parts.append("      </div>")
@@ -365,9 +378,12 @@ def _tel_link(tel):
     return "+" + dig if dig else ""
 
 
-def render_site(cfg, edit=False):
+def render_site(cfg, edit=False, preview=False):
     site = _merge(DEFAULT_SITE, cfg.get("site"))
     bot = _merge(DEFAULT_BOT, cfg.get("bot"))
+    # vídeo no cardápio: sempre na prévia, no site só se ligado; nunca no editor
+    com_video = (preview or site.get("videos_ativos")) and not edit
+    videos = site.get("videos") if com_video else None
     with open(TEMPLATE, encoding="utf-8") as f:
         html = f.read()
     preco_drink = (site["drink"].get("preco") or "0,00").replace("R$", "").strip()
@@ -405,7 +421,7 @@ def render_site(cfg, edit=False):
         "COMBO_UL2": _ul(site["combo"]["principal"], "site.combo.principal" if edit else None),
         "COMBO_UL3": _ul(site["combo"]["sobremesas"], "site.combo.sobremesas" if edit else None),
         "COMBO_NOTA": site["combo"]["nota"],
-        "MENU_COLS": _menu_cols(bot.get("cardapio"), site["menu"].get("subs"), edit),
+        "MENU_COLS": _menu_cols(bot.get("cardapio"), site["menu"].get("subs"), edit, videos),
         "DRINK_TITULO": site["drink"]["titulo"],
         "DRINK_NOME": site["drink"]["nome"],
         "DRINK_DESC": site["drink"]["desc"],
@@ -457,6 +473,9 @@ def render_site(cfg, edit=False):
 
     for k, v in valores.items():
         html = html.replace(f"@@{k}@@", str(v))
+
+    if videos:
+        html = html.replace("</body>", VIDEO_UI + "\n</body>")
 
     if edit:
         ui = (EDITOR_UI
@@ -517,14 +536,85 @@ def publish_site(cfg):
     principal = render_embreve(cfg) if site.get("emBreve") else completo
     with open(os.path.join(PUBLIC_HTML, "index.html"), "w", encoding="utf-8") as f:
         f.write(principal)
-    # prévia: site completo num caminho reservado, invisível pra buscadores
+    # prévia: site completo num caminho reservado, invisível pra buscadores.
+    # É onde as novidades (ex: vídeo no cardápio) aparecem antes de irem pro ar.
     prev_dir = os.path.join(PUBLIC_HTML, _preview_slug(site))
     os.makedirs(prev_dir, exist_ok=True)
-    preview = completo.replace(
+    preview = render_site(cfg, preview=True).replace(
         "</head>", '<meta name="robots" content="noindex,nofollow">\n</head>', 1)
     with open(os.path.join(prev_dir, "index.html"), "w", encoding="utf-8") as f:
         f.write(preview)
     return True, "site publicado"
+
+
+# --------------------------------------------------------------------------
+# Vídeo no cardápio — hover no desktop, toque no celular
+# --------------------------------------------------------------------------
+VIDEO_UI = """
+<style>
+  .item.com-video{cursor:pointer}
+  .item.com-video .item-name{display:inline-block;transform-origin:left center;
+    transition:transform .32s cubic-bezier(.2,.7,.2,1),color .32s}
+  .item.com-video .item-name::after{content:"▸";margin-left:8px;font-size:.72em;
+    color:var(--gold);opacity:.55;transition:opacity .3s,transform .32s;display:inline-block}
+  .item.com-video:hover .item-name,.item.com-video.aberto .item-name{
+    transform:scale(1.07);color:var(--gold-soft)}
+  .item.com-video:hover .item-name::after,.item.com-video.aberto .item-name::after{
+    opacity:1;transform:rotate(90deg)}
+  .item.com-video .item-desc{transition:color .3s}
+  .item.com-video:hover .item-desc,.item.com-video.aberto .item-desc{color:var(--cream)}
+  .video-wrap{max-height:0;opacity:0;overflow:hidden;
+    transition:max-height .5s cubic-bezier(.2,.7,.2,1),opacity .35s ease,margin-top .5s}
+  .item.com-video:hover .video-wrap,.item.com-video.aberto .video-wrap{
+    max-height:300px;opacity:1;margin-top:14px}
+  .video-wrap video{width:160px;max-width:52vw;aspect-ratio:9/16;object-fit:cover;
+    border-radius:12px;display:block;background:var(--ink-3);
+    box-shadow:0 18px 40px -18px rgba(0,0,0,.9),0 0 0 1px var(--line-strong)}
+  @media(hover:none){
+    .item.com-video .item-name::after{content:"▸ ver";font-size:.6em;letter-spacing:.06em;
+      opacity:.75;transform:none}
+    .item.com-video.aberto .item-name::after{content:"▾ fechar";transform:none}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .item.com-video .item-name,.video-wrap{transition:none}
+  }
+</style>
+<script>
+(function(){
+  var podeHover = window.matchMedia("(hover:hover) and (pointer:fine)").matches;
+  var itens = document.querySelectorAll(".item.com-video");
+
+  function abrir(it){
+    var v = it.querySelector("video");
+    if(!v) return;
+    var p = v.play();
+    if(p && p.catch) p.catch(function(){});
+  }
+  function fechar(it){
+    var v = it.querySelector("video");
+    if(!v) return;
+    v.pause(); v.currentTime = 0;
+  }
+
+  itens.forEach(function(it){
+    if(podeHover){
+      it.addEventListener("mouseenter", function(){ abrir(it); });
+      it.addEventListener("mouseleave", function(){ fechar(it); });
+    }
+    // toque (celular) e clique tambem alternam, para quem preferir fixar aberto
+    it.addEventListener("click", function(){
+      var jaAberto = it.classList.contains("aberto");
+      itens.forEach(function(o){
+        if(o !== it && o.classList.contains("aberto")){
+          o.classList.remove("aberto"); fechar(o);
+        }
+      });
+      if(jaAberto){ it.classList.remove("aberto"); fechar(it); }
+      else{ it.classList.add("aberto"); abrir(it); }
+    });
+  });
+})();
+</script>"""
 
 
 # --------------------------------------------------------------------------
