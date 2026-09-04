@@ -578,11 +578,16 @@ VIDEO_UI = """
   .item.com-video.aberto .item-desc{color:var(--cream)}
   .item.com-video.aberto .video-wrap{max-height:300px;opacity:1;margin-top:14px}
   .item.com-video.aberto .video-wrap .dica{display:block}
-  .video-wrap video{width:100%;height:260px;object-fit:contain;display:block;
-    background:#000;border-radius:12px;box-shadow:0 18px 40px -18px rgba(0,0,0,.9),
+  .video-wrap video{width:auto;max-width:100%;height:240px;object-fit:contain;display:block;
+    margin:0 auto;background:#000;border-radius:12px;box-shadow:0 18px 40px -18px rgba(0,0,0,.9),
     0 0 0 1px var(--line-strong)}
   .video-wrap .dica{margin-top:7px;font-size:.72rem;letter-spacing:.12em;
     text-transform:uppercase;color:var(--cream-dim);text-align:center}
+
+  @media(max-width:560px){
+    .video-wrap video{height:170px}
+    .item.com-video.aberto .video-wrap{max-height:215px}
+  }
 
   /* tela cheia */
   #cinema{position:fixed;inset:0;z-index:200;display:flex;align-items:center;
@@ -661,17 +666,22 @@ VIDEO_UI = """
       it.addEventListener("mouseenter", function(){ previa(it, true); });
       it.addEventListener("mouseleave", function(){ previa(it, false); });
     }
-    it.addEventListener("click", function(){
-      // celular: 1o toque abre a previa (mudo, em loop), 2o toque abre em tela cheia com som
-      if(!podeHover && !it.classList.contains("aberto")){
-        itens.forEach(function(o){
-          if(o !== it){ o.classList.remove("aberto"); previa(o, false); }
-        });
-        it.classList.add("aberto");
-        previa(it, true);
+    it.addEventListener("click", function(e){
+      // no celular o titulo abre e fecha a previa; tocar no video e que leva pra tela cheia
+      if(podeHover || (e.target.closest && e.target.closest(".video-wrap"))){
+        abrirCinema(v.getAttribute("src"));
         return;
       }
-      abrirCinema(v.getAttribute("src"));
+      if(it.classList.contains("aberto")){
+        it.classList.remove("aberto");
+        previa(it, false);
+        return;
+      }
+      itens.forEach(function(o){
+        if(o !== it){ o.classList.remove("aberto"); previa(o, false); }
+      });
+      it.classList.add("aberto");
+      previa(it, true);
     });
   });
 })();
