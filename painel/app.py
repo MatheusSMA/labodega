@@ -203,11 +203,8 @@ DEFAULT_SITE = {
     # Vídeo por prato: nome exato do item -> arquivo em /video/.
     # A prévia (/teste01) sempre mostra; o site principal só com videos_ativos=True.
     "videos_ativos": False,
-    "videos": {
-        "Frango com Caesar": "/video/frango-trigo.mp4",
-        "Picadinho carioca": "/video/frango-trigo.mp4",
-        "Risoto caprese": "/video/frango-trigo.mp4",
-    },
+    # demo: o mesmo video em todos os pratos ate cada um ter o seu
+    "videos": {it["nome"]: "/video/frango-trigo.mp4" for it in MENU_REAL},
 }
 
 # textos com formatação leve permitida no editor visual
@@ -631,8 +628,10 @@ VIDEO_UI = """
     if(!v) return;
     if(ligar) tocar(v); else { v.pause(); v.currentTime = 0; }
   }
+  var abertoEm = 0;
   function abrirCinema(src){
     itens.forEach(function(o){ previa(o, false); });
+    abertoEm = Date.now();
     telao.src = src;
     cinema.classList.add("on");
     document.body.style.overflow = "hidden";
@@ -647,6 +646,8 @@ VIDEO_UI = """
   }
 
   cinema.addEventListener("click", function(e){
+    // no celular o mesmo toque que abriu chega aqui como clique fantasma
+    if(Date.now() - abertoEm < 450) return;
     if(e.target === cinema || e.target.classList.contains("fechar")) fecharCinema();
   });
   document.addEventListener("keydown", function(e){
