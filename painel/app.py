@@ -341,7 +341,7 @@ def _menu_cols(cardapio, subs, edit=False, videos=None):
                 linha += (f'<div class="video-wrap">'
                           f'<video src="{video}" poster="{capa}" muted loop playsinline '
                           f'preload="none"></video>'
-                          f'<div class="dica">clique para ver em tela cheia</div></div>')
+                          f'<div class="dica">ver em tela cheia</div></div>')
             linha += "</div>"
             parts.append(linha)
         parts.append("      </div>")
@@ -573,6 +573,14 @@ VIDEO_UI = """
   @media(hover:hover) and (pointer:fine){
     .item.com-video:hover .video-wrap{max-height:300px;opacity:1;margin-top:14px}
   }
+
+  /* previa aberta por toque — o JS so marca .aberto onde nao existe hover */
+  .item.com-video.aberto .item-name{transform:scale(1.06);color:var(--gold-soft)}
+  .item.com-video.aberto .item-name::after{content:"▸";font-size:.72em;opacity:1;
+    transform:rotate(90deg)}
+  .item.com-video.aberto .item-desc{color:var(--cream)}
+  .item.com-video.aberto .video-wrap{max-height:300px;opacity:1;margin-top:14px}
+  .item.com-video.aberto .video-wrap .dica{display:block}
   .video-wrap video{width:100%;height:260px;object-fit:contain;display:block;
     background:#000;border-radius:12px;box-shadow:0 18px 40px -18px rgba(0,0,0,.9),
     0 0 0 1px var(--line-strong)}
@@ -597,7 +605,6 @@ VIDEO_UI = """
   @media(hover:none){
     .item.com-video .item-name::after{content:"▸ ver";font-size:.6em;letter-spacing:.06em;
       opacity:.75;transform:none}
-    .item.com-video.aberto .item-name::after{content:"▸ ver";transform:none}
     .video-wrap .dica{display:none}
   }
   @media(prefers-reduced-motion:reduce){
@@ -636,6 +643,7 @@ VIDEO_UI = """
     document.body.style.overflow = "";
     telao.pause();
     setTimeout(function(){ if(!cinema.classList.contains("on")) telao.removeAttribute("src"); }, 500);
+    itens.forEach(function(o){ if(o.classList.contains("aberto")) previa(o, true); });
   }
 
   cinema.addEventListener("click", function(e){
@@ -653,7 +661,15 @@ VIDEO_UI = """
       it.addEventListener("mouseleave", function(){ previa(it, false); });
     }
     it.addEventListener("click", function(){
-      // no celular a primeira toque ja abre em tela cheia
+      // celular: 1o toque abre a previa (mudo, em loop), 2o toque abre em tela cheia com som
+      if(!podeHover && !it.classList.contains("aberto")){
+        itens.forEach(function(o){
+          if(o !== it){ o.classList.remove("aberto"); previa(o, false); }
+        });
+        it.classList.add("aberto");
+        previa(it, true);
+        return;
+      }
       abrirCinema(v.getAttribute("src"));
     });
   });
