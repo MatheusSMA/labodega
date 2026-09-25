@@ -28,6 +28,7 @@ COPIAR=0
 cmp -s painel/app.py "$PAINEL/app.py" || COPIAR=1
 cmp -s painel/site_template.html "$PAINEL/site_template.html" || COPIAR=1
 cmp -s painel/painel.html "$PAINEL/painel.html" || COPIAR=1
+cmp -s public/privacidade.html "$SITE/privacidade.html" || COPIAR=1
 
 if [ "$COPIAR" = "1" ]; then
   echo "[$(date '+%Y-%m-%d %H:%M')] atualizando $ANTES -> $DEPOIS"
@@ -37,6 +38,7 @@ if [ "$COPIAR" = "1" ]; then
   mkdir -p "$SITE/img" "$SITE/video"
   cp -f public/img/* "$SITE/img/" 2>/dev/null || true
   cp -f public/video/* "$SITE/video/" 2>/dev/null || true
+  cp -f public/privacidade.html "$SITE/"
   mkdir -p "$PAINEL/tmp"
   touch "$PAINEL/tmp/restart.txt"
   echo "  arquivos copiados, app reiniciado"
