@@ -86,10 +86,10 @@
     <div class="card">
       <h2>Cardápio</h2>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
-        <input type="file" id="pdf_file" accept="application/pdf" style="flex:1;min-width:180px">
+        <input type="file" id="pdf_file" accept="application/pdf,image/*" style="flex:1;min-width:180px">
         <button type="button" class="addbtn" style="width:auto;padding:9px 14px" onclick="importarPdf()">📄 Importar do PDF</button>
       </div>
-      <small class="dim">Suba o cardápio em PDF e a IA preenche os itens, preços e descrições. Funciona com PDF de texto (não foto/escaneado). Confira e clique em Salvar.</small>
+      <small class="dim">Suba o cardápio em PDF (ou uma foto dele) e a IA preenche os itens, preços e descrições, página por página. No plano grátis da IA leva uns 20 segundos por página: deixe a aba aberta. Depois confira e clique em Salvar.</small>
       <div id="pdf_st" style="font-size:13px;margin:6px 0 12px"></div>
       <div id="cardapio"></div>
       <button type="button" class="addbtn" onclick="addCard()">+ Adicionar item</button>
@@ -300,21 +300,77 @@ function addFaq(q={p:"",r:""}) {
     <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
   el("faq").appendChild(row);
 }
-// texto cru do último PDF importado: o bot usa como reserva quando o item não bate
+// texto cru de cardápio antigo (o bot usa como reserva); importar pela IA zera, porque os itens já vêm prontos
 let CARDAPIO_PDF = "";
+// Cardápio costuma ser arte (imagem), sem texto: o navegador vira cada página em foto
+// (pdf.js) e manda uma por vez pra IA com visão, que devolve os itens daquela página.
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+function carregarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  return new Promise((ok, falha) => {
+    const s = document.createElement("script"); s.src = PDFJS + "pdf.min.js";
+    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(); };
+    s.onerror = () => falha(new Error("não consegui carregar o leitor de PDF"));
+    document.head.appendChild(s);
+  });
+}
+async function paginasEmFoto(file) {
+  if (file.type.startsWith("image/")) {
+    const img = await createImageBitmap(file), c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height; c.getContext("2d").drawImage(img, 0, 0); return [c];
+  }
+  await carregarPdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, fotos = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const pg = await pdf.getPage(n), v1 = pg.getViewport({ scale: 1 });
+    const v = pg.getViewport({ scale: 1600 / Math.max(v1.width, v1.height) });
+    const c = document.createElement("canvas"); c.width = v.width; c.height = v.height;
+    // intent "print": sem isso o pdf.js espera requestAnimationFrame, que trava com a aba em segundo plano
+    await pg.render({ canvasContext: c.getContext("2d"), viewport: v, intent: "print" }).promise; fotos.push(c);
+  }
+  return fotos;
+}
+function metades(c) {  // com uma faixa em comum, pra não cortar item no meio
+  const h = Math.ceil(c.height / 2) + 60;
+  return [0, c.height - h].map(y => { const m = document.createElement("canvas");
+    m.width = c.width; m.height = h; m.getContext("2d").drawImage(c, 0, y, c.width, h, 0, 0, c.width, h); return m; });
+}
+async function lerFoto(c, st, rotulo, nivel = 0) {
+  for (;;) {
+    const j = await trata(await fetch(API + "/cardapio-pagina", { method:"POST", headers:{"content-type":"application/json"},
+      body: JSON.stringify({ imagem: c.toDataURL("image/jpeg", 0.8) }) }));
+    if (j.ok) return j.itens;
+    if (j.espera) {  // limite do plano grátis da IA: espera e tenta de novo
+      st.textContent = `⏳ ${rotulo}: aguardando o limite grátis da IA (${Math.ceil(j.espera)}s)...`;
+      await new Promise(r => setTimeout(r, j.espera * 1000 + 500)); continue;
+    }
+    if (j.cortado && nivel < 2) {  // página cheia demais pra uma resposta: lê em metades
+      let itens = [];
+      for (const m of metades(c)) itens = itens.concat(await lerFoto(m, st, rotulo, nivel + 1));
+      return itens;
+    }
+    throw new Error(j.erro || "a IA não conseguiu ler " + rotulo);
+  }
+}
 async function importarPdf() {
   const st = el("pdf_st"), f = el("pdf_file").files[0];
   if (!f) { st.textContent = "Escolha o PDF primeiro."; st.style.color = "#ffb454"; return; }
   if (document.querySelectorAll("#cardapio .crow").length &&
-      !confirm("Isso SUBSTITUI os itens do cardápio pelos do PDF (só vale depois de Salvar). Continuar?")) return;
-  st.textContent = "🤖 Lendo o PDF e montando o cardápio... (pode levar até 1 minuto)"; st.style.color = "#9aa0ab";
-  const fd = new FormData(); fd.append("arquivo", f);
+      !confirm("Isso SUBSTITUI os itens do cardápio pelos do arquivo (só vale depois de Salvar). Continuar?")) return;
+  st.style.color = "#9aa0ab"; st.textContent = "Abrindo o arquivo...";
   try {
-    const j = await trata(await fetch(API + "/cardapio-pdf", { method:"POST", body: fd }));
-    if (!j.ok) { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; return; }
-    el("cardapio").innerHTML = ""; j.itens.forEach(addCard); CARDAPIO_PDF = j.texto || "";
-    st.textContent = `✅ ${j.itens.length} itens lidos. Confira abaixo e clique em Salvar.`; st.style.color = "#25D366";
-  } catch (e) { if (String(e).indexOf("sem login") < 0) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; } }
+    const fotos = await paginasEmFoto(f); let itens = [];
+    for (let i = 0; i < fotos.length; i++) {
+      st.textContent = `🤖 Lendo página ${i+1} de ${fotos.length}... (${itens.length} itens até agora)`;
+      itens = itens.concat(await lerFoto(fotos[i], st, `página ${i+1}`));
+    }
+    // página que continua a seção da anterior vem sem título: herda a categoria de cima
+    let ultima = ""; itens.forEach(it => { if (it.categoria) ultima = it.categoria; else it.categoria = ultima; });
+    const vistos = new Set();  // a faixa em comum das metades pode repetir item
+    itens = itens.filter(it => { const k = it.nome.toLowerCase() + "|" + it.preco; return !vistos.has(k) && vistos.add(k); });
+    el("cardapio").innerHTML = ""; itens.forEach(addCard); CARDAPIO_PDF = "";
+    st.textContent = `✅ ${itens.length} itens lidos. Confira abaixo e clique em Salvar.`; st.style.color = "#25D366";
+  } catch (e) { if (String(e).indexOf("sem login") < 0) { st.textContent = "❌ " + e.message; st.style.color = "#ff6b6b"; } }
 }
 function fillForm(b) {
   CARDAPIO_PDF = b.cardapio_pdf || "";

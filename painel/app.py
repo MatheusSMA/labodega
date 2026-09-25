@@ -13,12 +13,12 @@ Proteção de escrita: header x-panel-key == env PANEL_KEY (Setup Python App).
 """
 import glob
 import hashlib
-import io
 import json
 import os
 import re
 import secrets
 import time
+import urllib.error
 import urllib.request
 from flask import Flask, request, jsonify, Response, session, redirect, url_for
 
@@ -29,9 +29,10 @@ CFG = os.path.join(DATA_DIR, "labodega.json")
 TEMPLATE = os.path.join(BASE, "site_template.html")
 PUBLIC_HTML = os.environ.get("PUBLIC_HTML_DIR") or os.path.expanduser("~/public_html")
 PANEL_KEY = os.environ.get("PANEL_KEY", "").strip()
-# IA que lê o cardápio em PDF (mesma chave do bot; configurar no Setup Python App)
+# IA que lê o cardápio (mesma chave do bot; configurar no Setup Python App).
+# Hoje é o único modelo da Groq que lê imagem; se aposentarem, troque pela env.
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b").strip()
+GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip()
 
 # --------------------------------------------------------------------------
 # Padrões — espelham exatamente o conteúdo atual do site (primeira publicação
@@ -1295,7 +1296,21 @@ def api_upload(slot):
     return _json({"ok": True, "path": "/img/" + fname, "publicado": ok, "msg": msg})
 
 
-# ---------------- importar cardápio de PDF (IA) ----------------
+# ---------------- importar cardápio (IA com visão) ----------------
+# Cardápio de restaurante quase sempre é arte (imagem), sem texto pra extrair do PDF.
+# Então o navegador transforma cada página em foto (pdf.js) e manda uma por vez; o
+# modelo de visão da Groq lê a foto e devolve os itens.
+PROMPT_CARDAPIO = (
+    "Esta é uma página do cardápio de um restaurante. Extraia TODOS os itens que têm "
+    'preço. Responda APENAS com JSON compacto, sem espaços extras: {"itens":[{"categoria":"",'
+    '"nome":"","preco":0,"desc":"","tags":""}]}. categoria = título da seção onde o item '
+    "está. nome = nome do prato com só a primeira letra maiúscula. preco = número com ponto "
+    "decimal. desc = descrição/como é feito, do jeito que está escrito. tags = 'vegano' ou "
+    "'vegetariano' só se a página indicar. NÃO invente nada. Página sem itens: "
+    '{"itens":[]}'
+)
+
+
 def _num(v):
     try:
         return float(str(v).replace("R$", "").replace(",", ".").strip())
@@ -1303,29 +1318,24 @@ def _num(v):
         return 0.0
 
 
-def _ia_itens(texto):
-    """Pede pra IA (Groq) transformar o texto do cardápio em itens do painel."""
-    if not GROQ_API_KEY:
-        raise RuntimeError("falta a variável GROQ_API_KEY no Setup Python App do cPanel")
-    prompt = (
-        "Extraia TODOS os itens do cardápio abaixo. Responda APENAS com JSON no formato "
-        '{"itens": [{"categoria": "", "nome": "", "preco": 0, "desc": "", "tags": ""}]}. '
-        "preco é número com ponto decimal (0 se não houver). categoria é o título da seção "
-        "do cardápio (ex: Entradas, Pratos, Bebidas). desc é como o prato é feito / o que "
-        "acompanha, do jeito que está no texto. Em tags ponha 'vegano' ou 'vegetariano' só "
-        "se o texto indicar. NÃO invente itens, preços nem descrições.\n\n" + texto[:20000]
-    )
+def _ia_itens(imagem_b64):
+    """Itens de UMA página (foto em base64). None = resposta cortou (página cheia demais)."""
+    body = {"model": GROQ_VISION_MODEL, "temperature": 0.1, "reasoning_effort": "none",
+            # o plano grátis da Groq libera 1000 tokens de saída por minuto nesse modelo
+            "max_tokens": 950, "response_format": {"type": "json_object"},
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": PROMPT_CARDAPIO},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + imagem_b64}}]}]}
     req = urllib.request.Request(
-        "https://api.groq.com/openai/v1/chat/completions",
-        data=json.dumps({"model": GROQ_MODEL, "temperature": 0.1,
-                         "response_format": {"type": "json_object"},
-                         "messages": [{"role": "user", "content": prompt}]}).encode(),
+        "https://api.groq.com/openai/v1/chat/completions", data=json.dumps(body).encode(),
         # sem User-Agent próprio o Cloudflare da Groq recusa o urllib (erro 1010)
         headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json",
                  "User-Agent": "labodega-painel"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        conteudo = json.load(r)["choices"][0]["message"]["content"]
-    itens = (json.loads(conteudo) or {}).get("itens") or []
+    with urllib.request.urlopen(req, timeout=90) as r:
+        escolha = json.load(r)["choices"][0]
+    if escolha.get("finish_reason") == "length":
+        return None
+    itens = (json.loads(escolha["message"]["content"]) or {}).get("itens") or []
     return [{"categoria": str(i.get("categoria") or "").strip(),
              "nome": str(i.get("nome") or "").strip(),
              "preco": _num(i.get("preco", 0)),
@@ -1334,27 +1344,28 @@ def _ia_itens(texto):
             for i in itens if isinstance(i, dict) and i.get("nome")]
 
 
-@app.post("/api/cardapio-pdf")
-def api_cardapio_pdf():
-    """Lê o texto do PDF e devolve os itens pra revisar no painel (não salva nada)."""
+@app.post("/api/cardapio-pagina")
+def api_cardapio_pagina():
+    """Recebe a foto de UMA página do cardápio e devolve os itens dela (não salva nada)."""
     if (r := _negado("bot")):
         return r
-    f = request.files.get("arquivo")
-    if not f:
-        return _json({"ok": False, "erro": "Escolha um arquivo PDF."}, 400)
+    if not GROQ_API_KEY:
+        return _json({"ok": False, "erro": "falta a variável GROQ_API_KEY no Setup Python App do cPanel"}, 500)
+    img = ((request.get_json(force=True, silent=True) or {}).get("imagem") or "").split(",")[-1]
+    if not img:
+        return _json({"ok": False, "erro": "Página sem imagem."}, 400)
     try:
-        from pypdf import PdfReader
-        paginas = PdfReader(io.BytesIO(f.read())).pages
-        texto = "\n".join((p.extract_text() or "").strip() for p in paginas).strip()
-    except Exception as e:
-        return _json({"ok": False, "erro": f"Não consegui abrir o PDF: {e}"}, 400)
-    if not texto:
-        return _json({"ok": False, "erro": "Esse PDF não tem texto (parece foto ou escaneado)."}, 400)
-    try:
-        itens = _ia_itens(texto)
+        itens = _ia_itens(img)
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            # limite do plano grátis: o navegador espera esse tempo e manda de novo
+            return _json({"ok": False, "espera": min(float(e.headers.get("retry-after") or 30), 90)}, 429)
+        return _json({"ok": False, "erro": f"Erro na IA ({e.code}): {e.read()[:300].decode(errors='ignore')}"}, 502)
     except Exception as e:
         return _json({"ok": False, "erro": f"Erro na IA: {e}"}, 502)
-    return _json({"ok": True, "itens": itens, "texto": texto})
+    if itens is None:
+        return _json({"ok": False, "cortado": True})  # o navegador manda em duas metades
+    return _json({"ok": True, "itens": itens})
 
 
 if __name__ == "__main__":
