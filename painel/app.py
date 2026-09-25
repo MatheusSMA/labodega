@@ -78,6 +78,9 @@ DEFAULT_BOT = {
     "delivery": {"faz": False, "bairros": "", "taxa": "", "tempo": ""},
     "pagamento": ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"],
     "cardapio": MENU_REAL,
+    "drinks": [],
+    # PDF que o bot manda pro cliente, por catálogo: {"cardapio": url, "drinks": url}
+    "pdfs": {},
     "faq": [],
     "cardapio_pdf": "",
 }
@@ -1228,7 +1231,9 @@ def api_save():
     if not body:
         return _json({"ok": False, "erro": "Seu usuário não tem permissão pra isso."}, 403)
     cfg = load_cfg()
-    cfg.update(body)
+    # seção é mesclada, não trocada: o que a tela não manda (ex: bot.pdfs) fica como está
+    for k, v in body.items():
+        cfg[k] = {**cfg.get(k, {}), **v} if isinstance(v, dict) else v
     save_cfg(cfg)
     ok, msg = publish_site(cfg)
     return _json({"ok": True, "publicado": ok, "msg": msg})
@@ -1366,6 +1371,41 @@ def api_cardapio_pagina():
     if itens is None:
         return _json({"ok": False, "cortado": True})  # o navegador manda em duas metades
     return _json({"ok": True, "itens": itens})
+
+
+CATALOGOS = {"cardapio", "drinks"}
+
+
+@app.post("/api/pdf/<tipo>")
+def api_pdf(tipo):
+    """Guarda o PDF que o bot manda pro cliente (o navegador já manda comprimido)."""
+    if (r := _negado("bot")):
+        return r
+    if tipo not in CATALOGOS:
+        return _json({"ok": False, "erro": "Catálogo desconhecido."}, 400)
+    f = request.files.get("arquivo")
+    dados = f.read() if f else b""
+    if not dados.startswith(b"%PDF"):
+        return _json({"ok": False, "erro": "Envie um arquivo PDF."}, 400)
+    if len(dados) > 20_000_000:  # Telegram não baixa documento por link acima de 20 MB
+        return _json({"ok": False, "erro": "PDF maior que 20 MB."}, 400)
+    pasta = os.path.join(PUBLIC_HTML, "cardapio")
+    os.makedirs(pasta, exist_ok=True)
+    # nome novo a cada envio: WhatsApp e Cloudflare guardam cópia do link antigo
+    fname = f"{tipo}-{int(time.time())}.pdf"
+    with open(os.path.join(pasta, fname), "wb") as out:
+        out.write(dados)
+    for velho in glob.glob(os.path.join(pasta, f"{tipo}-*.pdf")):
+        if os.path.basename(velho) != fname:
+            try:
+                os.remove(velho)
+            except OSError:
+                pass
+    url = f"https://{request.host}/cardapio/{fname}"
+    cfg = load_cfg()
+    cfg["bot"].setdefault("pdfs", {})[tipo] = url
+    save_cfg(cfg)
+    return _json({"ok": True, "url": url})
 
 
 if __name__ == "__main__":

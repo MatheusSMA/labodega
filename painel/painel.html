@@ -4,149 +4,236 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Painel — La Bodega</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  * { box-sizing:border-box; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-  body { margin:0; background:#0f1115; color:#e8eaed; }
-  .top { position:sticky; top:0; z-index:10; background:#141821; border-bottom:1px solid #272b36; padding:14px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-  .top h1 { font-size:17px; margin:0; }
-  .tabs { display:flex; gap:6px; margin-left:auto; }
-  .tab { background:#1b1e26; border:1px solid #272b36; color:#9aa0ab; padding:8px 16px; border-radius:9px; cursor:pointer; font-size:14px; }
-  .tab.active { background:#25D366; color:#06210f; border-color:#25D366; font-weight:700; }
-  .wrap { max-width:820px; margin:0 auto; padding:20px; }
-  .card { background:#1b1e26; border:1px solid #272b36; border-radius:16px; padding:20px; margin-bottom:18px; }
-  .card h2 { font-size:14px; margin:0 0 14px; color:#cfd3da; text-transform:uppercase; letter-spacing:.5px; }
-  label.field { display:block; margin-bottom:12px; font-size:13px; color:#9aa0ab; }
-  label.field input, label.field textarea { width:100%; margin-top:5px; }
-  input, textarea, select { background:#0f1115; border:1px solid #313644; color:#fff; border-radius:9px; padding:9px 11px; font-size:14px; }
-  input:focus, textarea:focus { outline:none; border-color:#25D366; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .chk { display:inline-flex; align-items:center; gap:7px; font-size:14px; margin:4px 14px 4px 0; cursor:pointer; }
-  .hrow { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  .hrow .chk { width:130px; }
-  .crow, .frow { display:flex; gap:8px; margin-bottom:8px; }
-  .crow input.c_cat { width:120px; } .crow input.c_preco { width:90px; }
-  .crow input, .frow input { flex:1; min-width:0; }
-  .del { background:#2a2f3a; border:none; color:#ff6b6b; border-radius:8px; width:38px; cursor:pointer; }
-  .addbtn { background:#222733; border:1px dashed #3a4150; color:#9aa0ab; border-radius:9px; padding:9px; width:100%; cursor:pointer; font-size:13px; }
-  .bar { position:sticky; bottom:0; background:#0f1115cc; backdrop-filter:blur(6px); padding:16px 0; display:flex; align-items:center; gap:16px; }
-  .save { background:#25D366; color:#06210f; border:none; font-weight:700; font-size:16px; padding:13px 26px; border-radius:11px; cursor:pointer; }
+  /* mesmas cores e fontes do site */
+  :root {
+    --ink:#1b1916; --ink-2:#23201c; --ink-3:#2c2823;
+    --cream:#e8e1d0; --cream-dim:#ada592; --gold:#c89a3e; --gold-soft:#e2bd62;
+    --line:rgba(232,225,208,.14); --line-strong:rgba(232,225,208,.28);
+    --ok:#7fc98f; --warn:#e2bd62; --err:#ef8a7a;
+    --serif:"Playfair Display",Georgia,serif; --sans:"Montserrat",system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--ink); color:var(--cream); font:15px/1.55 var(--sans); -webkit-font-smoothing:antialiased; padding-bottom:84px; }
+  a { color:var(--gold-soft); }
+  .hidden { display:none !important; }
+
+  .top { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:16px; padding:14px 24px; background:rgba(27,25,22,.96); border-bottom:1px solid var(--line); backdrop-filter:blur(6px); }
+  .brand { font:700 22px var(--serif); letter-spacing:.01em; }
+  .brand small { font:600 11px var(--sans); letter-spacing:.3em; text-transform:uppercase; color:var(--gold); margin-left:10px; }
+  .who { margin-left:auto; font-size:13px; color:var(--cream-dim); }
+  .who a { margin-left:12px; color:var(--cream-dim); text-decoration:none; border:1px solid var(--line-strong); padding:6px 12px; border-radius:8px; }
+  .who a:hover { color:var(--cream); border-color:var(--cream-dim); }
+
+  .layout { display:grid; grid-template-columns:230px 1fr; gap:32px; max-width:1180px; margin:0 auto; padding:28px 24px; }
+  nav.side { position:sticky; top:84px; align-self:start; display:flex; flex-direction:column; gap:4px; }
+  nav.side button, nav.side a { all:unset; cursor:pointer; padding:11px 14px; border-radius:10px; font-size:15px; font-weight:500; color:var(--cream-dim); border-left:3px solid transparent; }
+  nav.side button:hover, nav.side a:hover { color:var(--cream); background:var(--ink-2); }
+  nav.side button.on { color:var(--gold-soft); background:rgba(200,154,62,.12); border-left-color:var(--gold); }
+  nav.side .sep { height:1px; background:var(--line); margin:10px 6px; }
+
+  main { min-width:0; }
+  .sec h2 { font:700 30px/1.15 var(--serif); margin-bottom:6px; }
+  .sec > .hint { color:var(--cream-dim); margin-bottom:22px; }
+  .card { background:var(--ink-2); border:1px solid var(--line); border-radius:14px; padding:22px; margin-bottom:20px; }
+  .card h3 { font:600 18px var(--serif); margin-bottom:4px; }
+  .card .hint { color:var(--cream-dim); font-size:13.5px; margin-bottom:16px; }
+  .cardhead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  .cardhead input[type=search] { margin-left:auto; max-width:260px; }
+  .count { font:500 13px var(--sans); color:var(--gold); margin-left:6px; }
+
+  label.f { display:block; font-size:11.5px; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--cream-dim); }
+  label.f > input, label.f > textarea { margin-top:6px; }
+  input, textarea { width:100%; background:var(--ink); color:var(--cream); border:1px solid var(--line-strong); border-radius:9px; padding:11px 12px; font:15px var(--sans); }
+  textarea { resize:vertical; min-height:44px; }
+  input:focus, textarea:focus { outline:none; border-color:var(--gold); box-shadow:0 0 0 3px rgba(200,154,62,.18); }
+  input[type=checkbox] { width:18px; height:18px; accent-color:var(--gold); cursor:pointer; }
+  input[type=time] { width:auto; }
+  input[type=file] { padding:9px; cursor:pointer; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; }
+  .chk { display:inline-flex; align-items:center; gap:9px; margin:6px 20px 6px 0; cursor:pointer; font-size:15px; }
+  .chips { display:flex; flex-wrap:wrap; gap:10px; }
+  .chips .chk { margin:0; padding:9px 14px; border:1px solid var(--line-strong); border-radius:999px; }
+  .chips .chk:has(input:checked) { border-color:var(--gold); background:rgba(200,154,62,.12); color:var(--gold-soft); }
+
+  .btn { cursor:pointer; border:1px solid transparent; border-radius:10px; padding:11px 20px; font:600 14.5px var(--sans); }
+  .btn.primary { background:var(--gold); color:var(--ink); }
+  .btn.primary:hover { background:var(--gold-soft); }
+  .btn.ghost { background:none; color:var(--gold-soft); border-color:rgba(200,154,62,.5); }
+  .btn.ghost:hover { background:rgba(200,154,62,.1); }
+  .btn.wide { width:100%; margin-top:6px; }
+  .del { cursor:pointer; background:none; border:1px solid var(--line-strong); color:var(--err); border-radius:9px; width:40px; height:44px; font-size:15px; }
+  .del:hover { border-color:var(--err); }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .row input[type=file] { flex:1; min-width:220px; }
+  .st { margin-top:12px; font-size:14px; min-height:20px; }
+
+  .hrow { display:grid; grid-template-columns:150px auto auto auto; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .hrow:last-child { border-bottom:none; }
+  .hrow .ate { color:var(--cream-dim); }
+  .hrow.fechado input[type=time], .hrow.fechado .ate { opacity:.35; }
+
+  .pdfatual { display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px dashed var(--line-strong); border-radius:10px; margin-bottom:14px; font-size:14px; color:var(--cream-dim); }
+  .pdfatual a { font-weight:600; }
+
+  .item { display:grid; grid-template-columns:170px 1fr 120px 160px 40px; gap:10px 12px; align-items:end; padding:16px 0; border-bottom:1px solid var(--line);
+    grid-template-areas:"cat nome preco tags del" "desc desc desc desc ."; }
+  .item .cat { grid-area:cat; } .item .nome { grid-area:nome; } .item .preco { grid-area:preco; }
+  .item .tags { grid-area:tags; } .item .del { grid-area:del; } .item .desc { grid-area:desc; }
+  .item:last-child { border-bottom:none; }
+  .faqrow { display:grid; grid-template-columns:1fr 1.4fr 40px; gap:12px; align-items:end; padding:14px 0; border-bottom:1px solid var(--line); }
+
+  .urow { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:14px 0; border-bottom:1px solid var(--line); }
+  .urow b { font-size:15px; min-width:110px; }
+  .urow .chk { margin:0; }
+  .urow input[type=password] { flex:1; min-width:160px; }
+  .tag-admin { color:var(--gold); }
+
+  .savebar { position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex; justify-content:flex-end; align-items:center; gap:16px; padding:14px 24px; background:rgba(27,25,22,.97); border-top:1px solid var(--line); }
   #status { font-size:14px; }
-  small.dim { color:#6b717c; }
-  .hidden { display:none; }
-  .soon { text-align:center; color:#9aa0ab; padding:50px 20px; }
+
+  @media (max-width: 820px) {
+    .top { padding:12px 16px; }
+    .layout { grid-template-columns:1fr; gap:18px; padding:16px; }
+    nav.side { position:sticky; top:62px; z-index:15; flex-direction:row; overflow-x:auto; background:var(--ink); padding-bottom:8px; margin:0 -16px; padding:0 16px 8px; }
+    nav.side button, nav.side a { white-space:nowrap; border-left:none; border-bottom:3px solid transparent; }
+    nav.side button.on { border-bottom-color:var(--gold); }
+    nav.side .sep { display:none; }
+    .sec h2 { font-size:25px; }
+    .card { padding:16px; }
+    .item { grid-template-columns:1fr 1fr 40px; grid-template-areas:"cat cat del" "nome nome nome" "preco tags tags" "desc desc desc"; }
+    .faqrow { grid-template-columns:1fr; }
+    .faqrow .del { justify-self:end; }
+    .hrow { grid-template-columns:1fr auto auto auto; gap:8px; }
+    .savebar { padding:12px 16px; }
+    .savebar .btn { flex:1; }
+  }
 </style>
 </head>
 <body>
-<div class="top">
-  <h1>🍽️ Painel — La Bodega</h1>
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('bot')" id="tab-bot">Bot</button>
-    <button class="tab" onclick="location.href='editor'" id="tab-site">Site ✏️</button>
-    <button class="tab hidden" onclick="showTab('users')" id="tab-users">Usuários</button>
-    <a href="logout" style="color:#9aa0ab;font-size:13px;align-self:center;margin-left:8px;text-decoration:none" title="Sair do painel">Sair ⎋</a>
-  </div>
-</div>
+<header class="top">
+  <div class="brand">La Bodega<small>Painel</small></div>
+  <div class="who"><span id="me_user"></span><a href="logout">Sair</a></div>
+</header>
 
-<div class="wrap">
-  <div id="pane-bot">
-    <div class="card">
-      <h2>Dados gerais</h2>
-      <label class="field">Nome<input id="nome"></label>
-      <div class="grid2">
-        <label class="field">Telefone<input id="telefone"></label>
-        <label class="field">Endereço<input id="endereco"></label>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Horário de funcionamento</h2>
-      <div id="horarios"></div>
-      <small class="dim">Desmarque o dia para indicar que está fechado.</small>
-    </div>
-    <div class="card">
-      <h2>Reservas</h2>
-      <label class="chk"><input type="checkbox" id="rv_aceita"> Aceita reservas</label>
-      <div class="grid2" style="margin-top:10px;">
-        <label class="field">Máximo de pessoas<input id="rv_max" type="number"></label>
-        <label class="field">Antecedência<input id="rv_ant"></label>
-      </div>
-    </div>
-    <div class="card">
-      <h2>Delivery</h2>
-      <label class="chk"><input type="checkbox" id="dl_faz"> Faz entrega</label>
-      <div class="grid2" style="margin-top:10px;">
-        <label class="field">Bairros<input id="dl_bairros"></label>
-        <label class="field">Taxa<input id="dl_taxa"></label>
-      </div>
-      <label class="field">Tempo estimado<input id="dl_tempo"></label>
-    </div>
-    <div class="card">
-      <h2>Formas de pagamento</h2>
-      <div id="pagamento"></div>
-    </div>
-    <div class="card">
-      <h2>Cardápio</h2>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
-        <input type="file" id="pdf_file" accept="application/pdf,image/*" style="flex:1;min-width:180px">
-        <button type="button" class="addbtn" style="width:auto;padding:9px 14px" onclick="importarPdf()">📄 Importar do PDF</button>
-      </div>
-      <small class="dim">Suba o cardápio em PDF (ou uma foto dele) e a IA preenche os itens, preços e descrições, página por página. No plano grátis da IA leva uns 20 segundos por página: deixe a aba aberta. Depois confira e clique em Salvar.</small>
-      <div id="pdf_st" style="font-size:13px;margin:6px 0 12px"></div>
-      <div id="cardapio"></div>
-      <button type="button" class="addbtn" onclick="addCard()">+ Adicionar item</button>
-    </div>
-    <div class="card">
-      <h2>Perguntas frequentes (FAQ)</h2>
-      <div id="faq"></div>
-      <button type="button" class="addbtn" onclick="addFaq()">+ Adicionar pergunta</button>
-    </div>
-  </div>
+<div class="layout">
+  <nav class="side" id="nav">
+    <button data-sec="restaurante" class="bot">🏠 Restaurante</button>
+    <button data-sec="horarios" class="bot">🕒 Horários</button>
+    <button data-sec="servicos" class="bot">🛵 Reservas e delivery</button>
+    <button data-sec="cardapio" class="bot">🍽️ Cardápio</button>
+    <button data-sec="drinks" class="bot">🍹 Drinks</button>
+    <button data-sec="faq" class="bot">💬 Perguntas frequentes</button>
+    <div class="sep"></div>
+    <button data-sec="usuarios" id="nav-usuarios" class="hidden">👥 Usuários</button>
+    <a href="editor" id="nav-site">✏️ Editar o site</a>
+  </nav>
 
-  <!-- ================= ABA USUÁRIOS ================= -->
-  <div id="pane-users" class="hidden">
-    <div id="admin_users" class="hidden">
+  <main>
+    <section class="sec" id="sec-restaurante">
+      <h2>Restaurante</h2>
+      <p class="hint">O que o bot diz quando perguntam quem somos e onde fica.</p>
+      <div class="card grid">
+        <label class="f">Nome<input id="nome"></label>
+        <label class="f">Telefone<input id="telefone"></label>
+        <label class="f" style="grid-column:1/-1">Endereço<input id="endereco"></label>
+      </div>
+    </section>
+
+    <section class="sec hidden" id="sec-horarios">
+      <h2>Horários</h2>
+      <p class="hint">Desmarque o dia em que o restaurante não abre.</p>
+      <div class="card" id="horarios"></div>
+    </section>
+
+    <section class="sec hidden" id="sec-servicos">
+      <h2>Reservas e delivery</h2>
+      <p class="hint">O bot só oferece o que estiver ligado aqui.</p>
       <div class="card">
-        <h2>Usuários do painel</h2>
-        <p style="margin:0 0 12px;font-size:13px;color:#9aa0ab">Conectado como <b id="me_user">…</b></p>
+        <h3>Reservas</h3>
+        <label class="chk"><input type="checkbox" id="rv_aceita"> Aceitamos reservas</label>
+        <div class="grid" style="margin-top:12px">
+          <label class="f">Máximo de pessoas<input id="rv_max" type="number" min="0"></label>
+          <label class="f">Antecedência<input id="rv_ant" placeholder="ex: até 2 horas antes"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Delivery</h3>
+        <label class="chk"><input type="checkbox" id="dl_faz"> Fazemos entrega</label>
+        <div class="grid" style="margin-top:12px">
+          <label class="f">Bairros<input id="dl_bairros" placeholder="ex: Centro, Valparaíso"></label>
+          <label class="f">Taxa<input id="dl_taxa" placeholder="ex: R$ 8,00"></label>
+          <label class="f">Tempo estimado<input id="dl_tempo" placeholder="ex: 40 a 60 min"></label>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Formas de pagamento</h3>
+        <div class="chips" id="pagamento" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <section class="sec hidden" id="sec-cardapio" data-catalogo="cardapio"></section>
+    <section class="sec hidden" id="sec-drinks" data-catalogo="drinks"></section>
+
+    <section class="sec hidden" id="sec-faq">
+      <h2>Perguntas frequentes</h2>
+      <p class="hint">Respostas prontas que o bot usa (ex: “aceita pet?”, “tem estacionamento?”).</p>
+      <div class="card">
+        <div id="faq"></div>
+        <button class="btn ghost wide" onclick="addFaq(); marcarAlterado()">+ Adicionar pergunta</button>
+      </div>
+    </section>
+
+    <section class="sec hidden" id="sec-usuarios">
+      <h2>Usuários</h2>
+      <p class="hint">Quem entra no painel e o que cada um pode editar. Superadmin pode tudo.</p>
+      <div class="card">
+        <h3>Quem tem acesso</h3>
+        <p class="hint">Marque o que cada um pode editar (salva na hora). Pra trocar a senha de alguém, digite a nova e clique em 🔑.</p>
         <div id="lista_users"></div>
-        <small class="dim">Marque o que cada um pode editar (salva na hora). Redefinir senha: digite a nova senha na linha do usuário e clique em 🔑. Remover: ✕.</small>
       </div>
       <div class="card">
-        <h2>Convidar por link</h2>
-        <p style="margin:0 0 12px;font-size:13px;color:#9aa0ab">Gere um link e mande pra pessoa (WhatsApp, e-mail...). Ela mesma escolhe o usuário e a senha. O link vale <b>7 dias</b> e funciona <b>uma única vez</b>.</p>
-        <div style="margin-bottom:10px">Quem entrar pelo link pode editar:
+        <h3>Convidar por link</h3>
+        <p class="hint">A pessoa escolhe o próprio usuário e senha. O link vale 7 dias e funciona uma vez só.</p>
+        <div class="row">Pode editar:
           <label class="chk"><input type="checkbox" id="cv_bot" checked> Bot</label>
           <label class="chk"><input type="checkbox" id="cv_site" checked> Site</label>
+          <button class="btn ghost" onclick="gerarConvite()">🔗 Gerar link</button>
         </div>
-        <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="gerarConvite()">🔗 Gerar link de convite</button>
-        <span id="cv_st" style="font-size:13px;margin-left:10px"></span>
-        <div id="cv_box" style="display:none;gap:8px;margin-top:12px">
-          <input id="cv_url" readonly style="flex:1;font-size:13px">
-          <button type="button" class="addbtn" style="width:auto;padding:9px 14px" onclick="copiarConvite()">📋 Copiar</button>
+        <div class="row hidden" id="cv_box" style="margin-top:12px">
+          <input id="cv_url" readonly style="flex:1"><button class="btn primary" onclick="copiarConvite()">Copiar</button>
         </div>
+        <div class="st" id="cv_st"></div>
       </div>
       <div class="card">
-        <h2>Novo usuário (manual)</h2>
-        <div class="grid2">
-          <label class="field">Usuário (3+ letras)<input id="nu_user" placeholder="ex: labodega"></label>
-          <label class="field">Senha (6+ caracteres)<input type="password" id="nu_senha"></label>
+        <h3>Criar usuário</h3>
+        <div class="grid" style="margin:12px 0">
+          <label class="f">Usuário (3+ letras)<input id="nu_user" placeholder="ex: gerente"></label>
+          <label class="f">Senha (6+ caracteres)<input type="password" id="nu_senha"></label>
         </div>
-        <div style="margin-bottom:10px">Pode editar:
+        <div class="row">Pode editar:
           <label class="chk"><input type="checkbox" id="nu_bot" checked> Bot</label>
           <label class="chk"><input type="checkbox" id="nu_site" checked> Site</label>
+          <label class="chk tag-admin"><input type="checkbox" id="nu_admin"> Superadmin</label>
+          <button class="btn primary" onclick="criarUsuario()">Criar usuário</button>
         </div>
-        <label class="chk"><input type="checkbox" id="nu_admin"> Superadmin (pode tudo e gerencia usuários — normalmente só você)</label>
-        <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="criarUsuario()">➕ Criar usuário</button>
-        <span id="nu_st" style="font-size:13px;margin-left:10px"></span>
+        <div class="st" id="nu_st"></div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <div id="sem_perm" class="card hidden">Seu usuário ainda não tem permissão pra editar nada. Peça pro administrador liberar.</div>
+    <section class="sec hidden" id="sec-semperm">
+      <h2>Sem permissão</h2>
+      <p class="hint">Seu usuário ainda não pode editar nada. Peça pro administrador liberar.</p>
+    </section>
+  </main>
+</div>
 
-  <div class="bar" id="bar">
-    <button class="save" onclick="salvar()">💾 Salvar</button>
-    <span id="status"></span>
-  </div>
+<div class="savebar" id="bar">
+  <span id="status"></span>
+  <button class="btn primary" onclick="salvar()">Salvar alterações</button>
 </div>
 
 <script>
@@ -154,172 +241,164 @@ const BASE = location.pathname.replace(/\/+$/, "");
 const API = BASE + "/api";
 const DIAS = [["seg","Segunda"],["ter","Terça"],["qua","Quarta"],["qui","Quinta"],["sex","Sexta"],["sab","Sábado"],["dom","Domingo"]];
 const PAGOS = ["Pix","Cartão de crédito","Cartão de débito","Dinheiro","Vale-refeição"];
+const CATALOGOS = { cardapio: "Cardápio", drinks: "Drinks" };
+const COR = { ok:"var(--ok)", warn:"var(--warn)", err:"var(--err)", dim:"var(--cream-dim)" };
 const el = id => document.getElementById(id);
-const esc = s => (s||"").replace(/"/g,"&quot;");
-
-function showTab(t) {
-  ["bot","users"].forEach(x => {
-    el("pane-"+x).classList.toggle("hidden", t!==x);
-    el("tab-"+x).classList.toggle("active", t===x);
-  });
-}
-
-// ================= ABA USUÁRIOS =================
-async function carregarMe() {
-  try {
-    const me = await trata(await fetch(API + "/me"));
-    if (!me.ok) return;
-    const pode = p => me.admin || (me.perms || []).includes(p);
-    if (!pode("site")) el("tab-site").classList.add("hidden");
-    if (!pode("bot")) {
-      // só site: vai direto pro editor; nenhuma permissão: avisa
-      if (pode("site")) { location.href = "editor"; return; }
-      ["tab-bot", "pane-bot", "bar"].forEach(x => el(x).classList.add("hidden"));
-      el("sem_perm").classList.remove("hidden");
-    }
-    if (me.admin) {
-      el("tab-users").classList.remove("hidden");
-      el("admin_users").classList.remove("hidden");
-      el("me_user").textContent = me.usuario;
-      carregarUsuarios();
-    }
-  } catch (e) {}
-}
-
-async function carregarUsuarios() {
-  const j = await trata(await fetch(API + "/usuarios"));
-  if (!j.ok) return;
-  const box = el("lista_users"); box.innerHTML = "";
-  j.usuarios.forEach(u => {
-    const row = document.createElement("div"); row.className = "frow"; row.style.flexWrap = "wrap";
-    const tem = p => u.perms.includes(p) ? "checked" : "";
-    const trava = u.admin ? "disabled" : "";  // admin já pode tudo
-    row.innerHTML = `<span style="flex:1;align-self:center;font-size:14px;min-width:90px"><b>${esc(u.usuario)}</b></span>
-      <label class="chk"><input type="checkbox" class="p_bot" ${tem("bot")} ${trava}> Bot</label>
-      <label class="chk"><input type="checkbox" class="p_site" ${tem("site")} ${trava}> Site</label>
-      <label class="chk" style="color:#c89a3e"><input type="checkbox" class="p_admin" ${u.admin?"checked":""}> Admin</label>
-      <input type="password" class="rs_senha" placeholder="nova senha (6+)" style="flex:1">
-      <button type="button" class="del" style="color:#c89a3e" title="Redefinir senha" onclick="redefinirSenha('${esc(u.usuario)}', this)">🔑</button>
-      <button type="button" class="del" title="Remover usuário" onclick="removerUsuario('${esc(u.usuario)}')">✕</button>`;
-    row.querySelectorAll("input[type=checkbox]").forEach(c => c.onchange = () => salvarPerms(u.usuario, row));
-    box.appendChild(row);
-  });
-}
-
-const permsMarcadas = pref => ["bot","site"].filter(p => el(pref + p).checked);
-
-async function salvarPerms(usuario, row) {
-  const perms = ["bot","site"].filter(p => row.querySelector(".p_" + p).checked);
-  const j = await trata(await fetch(API + "/usuarios/permissoes", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ usuario, perms, admin: row.querySelector(".p_admin").checked }) }));
-  if (!j.ok) alert("Erro: " + (j.erro||""));
-  carregarUsuarios();
-}
-
-async function gerarConvite() {
-  const st = el("cv_st"); st.textContent = "gerando..."; st.style.color = "#9aa0ab";
-  const j = await trata(await fetch(API + "/convites", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ perms: permsMarcadas("cv_") }) }));
-  if (j.ok) {
-    st.textContent = "✅ link pronto — copie e mande!"; st.style.color = "#25D366";
-    el("cv_url").value = j.url;
-    el("cv_box").style.display = "flex";
-  } else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
-}
-
-function copiarConvite() {
-  const inp = el("cv_url"); inp.select(); inp.setSelectionRange(0, 999);
-  if (navigator.clipboard) { navigator.clipboard.writeText(inp.value); }
-  else { document.execCommand("copy"); }
-  el("cv_st").textContent = "✅ copiado!"; el("cv_st").style.color = "#25D366";
-}
-
-async function criarUsuario() {
-  const st = el("nu_st"); st.textContent = "criando..."; st.style.color = "#9aa0ab";
-  const j = await trata(await fetch(API + "/usuarios", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ usuario: el("nu_user").value, senha: el("nu_senha").value, admin: el("nu_admin").checked,
-      perms: permsMarcadas("nu_") }) }));
-  if (j.ok) { st.textContent = "✅ criado!"; st.style.color = "#25D366"; el("nu_user").value=""; el("nu_senha").value=""; el("nu_admin").checked=false; carregarUsuarios(); }
-  else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
-}
-
-async function redefinirSenha(usuario, btn) {
-  const senha = btn.parentElement.querySelector(".rs_senha").value;
-  const j = await trata(await fetch(API + "/usuarios/senha", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ usuario, senha }) }));
-  alert(j.ok ? "Senha de \"" + usuario + "\" redefinida!" : "Erro: " + (j.erro||""));
-  if (j.ok) carregarUsuarios();
-}
-
-async function removerUsuario(usuario) {
-  if (!confirm("Remover o usuário \"" + usuario + "\"? Ele perde o acesso ao painel.")) return;
-  const j = await trata(await fetch(API + "/usuarios/remover", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ usuario }) }));
-  if (!j.ok) alert("Erro: " + (j.erro||""));
-  carregarUsuarios();
-}
+const aviso = (alvo, texto, cor = "dim") => { alvo.textContent = texto; alvo.style.color = COR[cor]; };
 
 function trata(res) {
   if (res.status === 401) { location.href = "login"; throw new Error("sem login"); }
   return res.json();
 }
+const semLogin = e => String(e).indexOf("sem login") >= 0;
+
+// ---------------- navegação ----------------
+function mostrar(sec) {
+  document.querySelectorAll(".sec").forEach(s => s.classList.toggle("hidden", s.id !== "sec-" + sec));
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.sec === sec));
+  el("bar").classList.toggle("hidden", !PODE_BOT || sec === "usuarios");
+  history.replaceState(null, "", "#" + sec);
+  scrollTo(0, 0);
+}
+document.querySelectorAll("#nav button").forEach(b => b.onclick = () => mostrar(b.dataset.sec));
+addEventListener("hashchange", () => {
+  const b = document.querySelector(`#nav button[data-sec="${location.hash.slice(1)}"]`);
+  if (b && !b.classList.contains("hidden")) mostrar(b.dataset.sec);
+});
+
+// aviso ao sair com alteração não salva
+let ALTERADO = false;
+const marcarAlterado = () => { ALTERADO = true; aviso(el("status"), "Há alterações não salvas", "warn"); };
+document.querySelector("main").addEventListener("input", e => {
+  if (!e.target.closest("#sec-usuarios") && !["file", "search"].includes(e.target.type)) marcarAlterado();
+});
+addEventListener("beforeunload", e => { if (ALTERADO) e.preventDefault(); });
+
+// ---------------- campos simples ----------------
 function fillHorarios(h) {
   el("horarios").innerHTML = "";
-  DIAS.forEach(([k,label]) => {
-    const d = (h && h[k]) || {abre:false, ini:"", fim:""};
-    const row = document.createElement("div"); row.className = "hrow";
-    row.innerHTML = `<label class="chk"><input type="checkbox" class="abre" data-d="${k}" ${d.abre?"checked":""}> ${label}</label>
-      <input type="time" class="ini" data-d="${k}" value="${d.ini||""}"> <span style="color:#6b717c">às</span>
-      <input type="time" class="fim" data-d="${k}" value="${d.fim||""}">`;
+  DIAS.forEach(([k, label]) => {
+    const d = (h && h[k]) || { abre:false, ini:"", fim:"" };
+    const row = document.createElement("div"); row.className = "hrow" + (d.abre ? "" : " fechado");
+    row.innerHTML = `<label class="chk"><input type="checkbox" class="abre" data-d="${k}"> ${label}</label>
+      <input type="time" class="ini" data-d="${k}"> <span class="ate">às</span> <input type="time" class="fim" data-d="${k}">`;
+    row.querySelector(".abre").checked = !!d.abre;
+    row.querySelector(".abre").onchange = e => row.classList.toggle("fechado", !e.target.checked);
+    row.querySelector(".ini").value = d.ini || ""; row.querySelector(".fim").value = d.fim || "";
     el("horarios").appendChild(row);
   });
 }
 function fillPagamento(sel) {
-  el("pagamento").innerHTML = "";
-  const set = new Set(sel||[]);
+  const set = new Set(sel || []); el("pagamento").innerHTML = "";
   PAGOS.forEach(p => {
     const lab = document.createElement("label"); lab.className = "chk";
-    lab.innerHTML = `<input type="checkbox" class="pg" value="${p}" ${set.has(p)?"checked":""}> ${p}`;
+    lab.innerHTML = `<input type="checkbox" class="pg"> ${p}`;
+    lab.querySelector("input").value = p; lab.querySelector("input").checked = set.has(p);
     el("pagamento").appendChild(lab);
   });
 }
-function addCard(it={categoria:"",nome:"",preco:"",desc:"",tags:""}) {
-  const row = document.createElement("div"); row.className = "crow";
-  row.innerHTML = `<input class="c_cat" placeholder="Categoria" value="${esc(it.categoria)}">
-    <input class="c_nome" placeholder="Prato" value="${esc(it.nome)}">
-    <input class="c_preco" type="number" step="0.01" placeholder="Preço" value="${it.preco!==undefined?it.preco:""}">
-    <input class="c_desc" placeholder="Descrição" value="${esc(it.desc)}">
-    <input class="c_tags" placeholder="Tags" value="${esc(it.tags)}">
-    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
-  el("cardapio").appendChild(row);
-}
-function addFaq(q={p:"",r:""}) {
-  const row = document.createElement("div"); row.className = "frow";
-  row.innerHTML = `<input class="f_p" placeholder="Pergunta" value="${esc(q.p)}">
-    <input class="f_r" placeholder="Resposta" value="${esc(q.r)}">
-    <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
+function addFaq(q = { p:"", r:"" }) {
+  const row = document.createElement("div"); row.className = "faqrow";
+  row.innerHTML = `<label class="f">Pergunta<input class="f_p"></label>
+    <label class="f">Resposta<textarea class="f_r" rows="1"></textarea></label>
+    <button class="del" title="Remover pergunta">✕</button>`;
+  row.querySelector(".f_p").value = q.p || ""; row.querySelector(".f_r").value = q.r || "";
+  row.querySelector(".del").onclick = () => { row.remove(); marcarAlterado(); };
   el("faq").appendChild(row);
 }
+
+// ---------------- catálogos (cardápio e drinks) ----------------
+let PDFS = {};
 // texto cru de cardápio antigo (o bot usa como reserva); importar pela IA zera, porque os itens já vêm prontos
 let CARDAPIO_PDF = "";
+
+function montarCatalogo(tipo) {
+  const nome = CATALOGOS[tipo];
+  el("sec-" + tipo).innerHTML = `
+    <h2>${nome}</h2>
+    <p class="hint">Quando o cliente escolhe “${nome}” no WhatsApp, o bot manda o PDF. A lista de itens é o que o bot usa pra responder perguntas (ex: “tem opção vegana?”).</p>
+    <div class="card">
+      <h3>PDF que o cliente recebe</h3>
+      <p class="hint">Suba o PDF (ou uma foto) do ${nome.toLowerCase()}. O painel deixa o arquivo leve pro celular e, se marcado, a IA lê os itens página por página (uns 20 segundos por página: deixe a aba aberta).</p>
+      <div class="pdfatual" id="pdfatual-${tipo}"></div>
+      <div class="row">
+        <input type="file" id="arq-${tipo}" accept="application/pdf,image/*">
+        <button class="btn primary" onclick="enviarCatalogo('${tipo}')">Enviar</button>
+      </div>
+      <label class="chk" style="margin-top:12px"><input type="checkbox" id="ia-${tipo}" checked> Também ler os itens com a IA (substitui a lista abaixo)</label>
+      <div class="st" id="st-${tipo}"></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h3>Itens<span class="count" id="cnt-${tipo}"></span></h3>
+        <input type="search" placeholder="Buscar item..." oninput="filtrar('${tipo}', this.value)"></div>
+      <p class="hint">Confira nome, preço e descrição. Tags: “vegano” ou “vegetariano”.</p>
+      <div id="itens-${tipo}"></div>
+      <button class="btn ghost wide" onclick="addItem('${tipo}').querySelector('.i_nome').focus(); marcarAlterado()">+ Adicionar item</button>
+    </div>`;
+}
+function mostrarPdf(tipo) {
+  const url = PDFS[tipo];
+  el("pdfatual-" + tipo).innerHTML = url
+    ? `📄 <a href="${url}" target="_blank" rel="noopener">Ver o PDF que o cliente recebe</a>`
+    : "Nenhum PDF enviado ainda: o bot manda a lista de itens em texto.";
+}
+function contar(tipo) { el("cnt-" + tipo).textContent = el("itens-" + tipo).children.length + " itens"; }
+function addItem(tipo, it = {}) {
+  const row = document.createElement("div"); row.className = "item";
+  row.innerHTML = `<label class="f cat">Categoria<input class="i_cat"></label>
+    <label class="f nome">Nome<input class="i_nome"></label>
+    <label class="f preco">Preço (R$)<input class="i_preco" type="number" step="0.01" min="0"></label>
+    <label class="f tags">Tags<input class="i_tags" placeholder="vegano"></label>
+    <button class="del" title="Remover item">✕</button>
+    <label class="f desc">Descrição<textarea class="i_desc" rows="1"></textarea></label>`;
+  row.querySelector(".i_cat").value = it.categoria || "";
+  row.querySelector(".i_nome").value = it.nome || "";
+  row.querySelector(".i_preco").value = it.preco ?? "";
+  row.querySelector(".i_tags").value = it.tags || "";
+  row.querySelector(".i_desc").value = it.desc || "";
+  row.querySelector(".del").onclick = () => { row.remove(); contar(tipo); marcarAlterado(); };
+  el("itens-" + tipo).appendChild(row); contar(tipo);
+  return row;
+}
+function preencherItens(tipo, itens) {
+  el("itens-" + tipo).innerHTML = ""; (itens || []).forEach(it => addItem(tipo, it)); contar(tipo);
+}
+function coletarItens(tipo) {
+  return [...el("itens-" + tipo).querySelectorAll(".item")].map(r => ({
+    categoria: r.querySelector(".i_cat").value.trim(), nome: r.querySelector(".i_nome").value.trim(),
+    preco: parseFloat(r.querySelector(".i_preco").value || "0") || 0,
+    desc: r.querySelector(".i_desc").value.trim(), tags: r.querySelector(".i_tags").value.trim(),
+  })).filter(it => it.nome);
+}
+function filtrar(tipo, q) {
+  q = q.toLowerCase();
+  el("itens-" + tipo).querySelectorAll(".item").forEach(r => {
+    const txt = [...r.querySelectorAll("input,textarea")].map(i => i.value).join(" ").toLowerCase();
+    r.classList.toggle("hidden", !!q && !txt.includes(q));
+  });
+}
+
 // Cardápio costuma ser arte (imagem), sem texto: o navegador vira cada página em foto
 // (pdf.js) e manda uma por vez pra IA com visão, que devolve os itens daquela página.
+// As mesmas fotos viram um PDF leve (jsPDF) que é o que o cliente baixa no WhatsApp.
 const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
-function carregarPdfJs() {
-  if (window.pdfjsLib) return Promise.resolve();
+const JSPDF = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+function carregarScript(src) {
+  if (document.querySelector(`script[src="${src}"]`)) return Promise.resolve();
   return new Promise((ok, falha) => {
-    const s = document.createElement("script"); s.src = PDFJS + "pdf.min.js";
-    s.onload = () => { pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; ok(); };
-    s.onerror = () => falha(new Error("não consegui carregar o leitor de PDF"));
+    const s = document.createElement("script"); s.src = src; s.onload = ok;
+    s.onerror = () => falha(new Error("não consegui carregar " + src.split("/").pop()));
     document.head.appendChild(s);
   });
 }
 async function paginasEmFoto(file) {
   if (file.type.startsWith("image/")) {
     const img = await createImageBitmap(file), c = document.createElement("canvas");
-    c.width = img.width; c.height = img.height; c.getContext("2d").drawImage(img, 0, 0); return [c];
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); return [c];
   }
-  await carregarPdfJs();
+  await carregarScript(PDFJS + "pdf.min.js");
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js";
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, fotos = [];
   for (let n = 1; n <= pdf.numPages; n++) {
     const pg = await pdf.getPage(n), v1 = pg.getViewport({ scale: 1 });
@@ -329,6 +408,19 @@ async function paginasEmFoto(file) {
     await pg.render({ canvasContext: c.getContext("2d"), viewport: v, intent: "print" }).promise; fotos.push(c);
   }
   return fotos;
+}
+async function subirPdf(tipo, fotos) {
+  await carregarScript(JSPDF);
+  let doc;
+  fotos.forEach((c, i) => {
+    const fmt = [c.width, c.height], ori = c.width > c.height ? "l" : "p";
+    if (i) doc.addPage(fmt, ori); else doc = new jspdf.jsPDF({ unit: "px", format: fmt, orientation: ori, compress: true });
+    doc.addImage(c.toDataURL("image/jpeg", 0.75), "JPEG", 0, 0, c.width, c.height);
+  });
+  const fd = new FormData(); fd.append("arquivo", doc.output("blob"), tipo + ".pdf");
+  const j = await trata(await fetch(API + "/pdf/" + tipo, { method: "POST", body: fd }));
+  if (!j.ok) throw new Error(j.erro || "não consegui enviar o PDF");
+  return j.url;
 }
 function metades(c) {  // com uma faixa em comum, pra não cortar item no meio
   const h = Math.ceil(c.height / 2) + 60;
@@ -341,7 +433,7 @@ async function lerFoto(c, st, rotulo, nivel = 0) {
       body: JSON.stringify({ imagem: c.toDataURL("image/jpeg", 0.8) }) }));
     if (j.ok) return j.itens;
     if (j.espera) {  // limite do plano grátis da IA: espera e tenta de novo
-      st.textContent = `⏳ ${rotulo}: aguardando o limite grátis da IA (${Math.ceil(j.espera)}s)...`;
+      aviso(st, `⏳ ${rotulo}: aguardando o limite grátis da IA (${Math.ceil(j.espera)}s)...`);
       await new Promise(r => setTimeout(r, j.espera * 1000 + 500)); continue;
     }
     if (j.cortado && nivel < 2) {  // página cheia demais pra uma resposta: lê em metades
@@ -352,35 +444,41 @@ async function lerFoto(c, st, rotulo, nivel = 0) {
     throw new Error(j.erro || "a IA não conseguiu ler " + rotulo);
   }
 }
-async function importarPdf() {
-  const st = el("pdf_st"), f = el("pdf_file").files[0];
-  if (!f) { st.textContent = "Escolha o PDF primeiro."; st.style.color = "#ffb454"; return; }
-  if (document.querySelectorAll("#cardapio .crow").length &&
-      !confirm("Isso SUBSTITUI os itens do cardápio pelos do arquivo (só vale depois de Salvar). Continuar?")) return;
-  st.style.color = "#9aa0ab"; st.textContent = "Abrindo o arquivo...";
+async function enviarCatalogo(tipo) {
+  const st = el("st-" + tipo), f = el("arq-" + tipo).files[0], comIA = el("ia-" + tipo).checked;
+  if (!f) return aviso(st, "Escolha o arquivo primeiro.", "warn");
+  if (comIA && el("itens-" + tipo).children.length &&
+      !confirm("A lista de itens vai ser SUBSTITUÍDA pelo que a IA ler (só vale depois de Salvar). Continuar?")) return;
   try {
-    const fotos = await paginasEmFoto(f); let itens = [];
+    aviso(st, "Abrindo o arquivo...");
+    const fotos = await paginasEmFoto(f);
+    aviso(st, "Preparando o PDF pro cliente...");
+    PDFS[tipo] = await subirPdf(tipo, fotos); mostrarPdf(tipo);
+    if (!comIA) return aviso(st, "✅ PDF atualizado. O bot já manda esse pro cliente.", "ok");
+    let itens = [];
     for (let i = 0; i < fotos.length; i++) {
-      st.textContent = `🤖 Lendo página ${i+1} de ${fotos.length}... (${itens.length} itens até agora)`;
+      aviso(st, `🤖 PDF atualizado. Lendo página ${i+1} de ${fotos.length}... (${itens.length} itens até agora)`);
       itens = itens.concat(await lerFoto(fotos[i], st, `página ${i+1}`));
     }
     // página que continua a seção da anterior vem sem título: herda a categoria de cima
     let ultima = ""; itens.forEach(it => { if (it.categoria) ultima = it.categoria; else it.categoria = ultima; });
     const vistos = new Set();  // a faixa em comum das metades pode repetir item
     itens = itens.filter(it => { const k = it.nome.toLowerCase() + "|" + it.preco; return !vistos.has(k) && vistos.add(k); });
-    el("cardapio").innerHTML = ""; itens.forEach(addCard); CARDAPIO_PDF = "";
-    st.textContent = `✅ ${itens.length} itens lidos. Confira abaixo e clique em Salvar.`; st.style.color = "#25D366";
-  } catch (e) { if (String(e).indexOf("sem login") < 0) { st.textContent = "❌ " + e.message; st.style.color = "#ff6b6b"; } }
+    preencherItens(tipo, itens); if (tipo === "cardapio") CARDAPIO_PDF = ""; marcarAlterado();
+    aviso(st, `✅ PDF atualizado e ${itens.length} itens lidos. Confira a lista e clique em Salvar.`, "ok");
+  } catch (e) { if (!semLogin(e)) aviso(st, "❌ " + e.message, "err"); }
 }
+
+// ---------------- carregar / salvar ----------------
 function fillForm(b) {
-  CARDAPIO_PDF = b.cardapio_pdf || "";
-  el("nome").value = b.nome||""; el("telefone").value = b.telefone||""; el("endereco").value = b.endereco||"";
+  el("nome").value = b.nome || ""; el("telefone").value = b.telefone || ""; el("endereco").value = b.endereco || "";
   fillHorarios(b.horarios);
-  const rv = b.reservas||{}; el("rv_aceita").checked = !!rv.aceita; el("rv_max").value = rv.max_pessoas||""; el("rv_ant").value = rv.antecedencia||"";
-  const dl = b.delivery||{}; el("dl_faz").checked = !!dl.faz; el("dl_bairros").value = dl.bairros||""; el("dl_taxa").value = dl.taxa||""; el("dl_tempo").value = dl.tempo||"";
+  const rv = b.reservas || {}; el("rv_aceita").checked = !!rv.aceita; el("rv_max").value = rv.max_pessoas || ""; el("rv_ant").value = rv.antecedencia || "";
+  const dl = b.delivery || {}; el("dl_faz").checked = !!dl.faz; el("dl_bairros").value = dl.bairros || ""; el("dl_taxa").value = dl.taxa || ""; el("dl_tempo").value = dl.tempo || "";
   fillPagamento(b.pagamento);
-  el("cardapio").innerHTML = ""; (b.cardapio||[]).forEach(addCard);
-  el("faq").innerHTML = ""; (b.faq||[]).forEach(addFaq);
+  PDFS = b.pdfs || {}; CARDAPIO_PDF = b.cardapio_pdf || "";
+  Object.keys(CATALOGOS).forEach(t => { preencherItens(t, b[t]); mostrarPdf(t); });
+  el("faq").innerHTML = ""; (b.faq || []).forEach(addFaq);
 }
 function collectBot() {
   const horarios = {};
@@ -392,33 +490,117 @@ function collectBot() {
     slug: "labodega",
     nome: el("nome").value.trim(), telefone: el("telefone").value.trim(), endereco: el("endereco").value.trim(),
     horarios,
-    reservas: { aceita: el("rv_aceita").checked, max_pessoas: parseInt(el("rv_max").value||"0")||0, antecedencia: el("rv_ant").value.trim() },
+    reservas: { aceita: el("rv_aceita").checked, max_pessoas: parseInt(el("rv_max").value || "0") || 0, antecedencia: el("rv_ant").value.trim() },
     delivery: { faz: el("dl_faz").checked, bairros: el("dl_bairros").value.trim(), taxa: el("dl_taxa").value.trim(), tempo: el("dl_tempo").value.trim() },
-    pagamento: [...document.querySelectorAll(".pg:checked")].map(x=>x.value),
-    cardapio: [...document.querySelectorAll("#cardapio .crow")].map(r=>({
-      categoria: r.querySelector(".c_cat").value.trim(), nome: r.querySelector(".c_nome").value.trim(),
-      preco: parseFloat(r.querySelector(".c_preco").value||"0")||0,
-      desc: r.querySelector(".c_desc").value.trim(), tags: r.querySelector(".c_tags").value.trim() })).filter(it=>it.nome),
-    faq: [...document.querySelectorAll("#faq .frow")].map(r=>({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q=>q.p),
+    pagamento: [...document.querySelectorAll(".pg:checked")].map(x => x.value),
+    cardapio: coletarItens("cardapio"), drinks: coletarItens("drinks"),
+    faq: [...document.querySelectorAll("#faq .faqrow")].map(r => ({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q => q.p),
     cardapio_pdf: CARDAPIO_PDF,
   };
 }
 async function salvar() {
-  const st = el("status"); st.textContent = "Salvando..."; st.style.color = "#9aa0ab";
+  const st = el("status"); aviso(st, "Salvando...");
   try {
-    const res = await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ bot: collectBot() }) });
-    const j = await trata(res);
-    if (j.ok && j.publicado) { st.textContent = "✅ Salvo e site atualizado!"; st.style.color = "#25D366"; }
-    else if (j.ok) { st.textContent = "⚠ Salvo, mas o site não publicou: " + (j.msg||""); st.style.color = "#ffb454"; }
-    else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
-  } catch (e) { if (String(e).indexOf("sem login") < 0) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; } }
+    const j = await trata(await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ bot: collectBot() }) }));
+    if (!j.ok) return aviso(st, "❌ " + (j.erro || "erro"), "err");
+    ALTERADO = false;
+    if (j.publicado) aviso(st, "✅ Salvo. O bot usa as mudanças em até 1 minuto.", "ok");
+    else aviso(st, "⚠ Salvo, mas o site não publicou: " + (j.msg || ""), "warn");
+  } catch (e) { if (!semLogin(e)) aviso(st, "❌ " + e, "err"); }
 }
+
+// ---------------- usuários ----------------
+let PODE_BOT = true;
+async function carregarMe() {
+  const me = await trata(await fetch(API + "/me"));
+  if (!me.ok) return;
+  el("me_user").textContent = me.usuario;
+  const pode = p => me.admin || (me.perms || []).includes(p);
+  PODE_BOT = pode("bot");
+  if (!pode("site")) el("nav-site").classList.add("hidden");
+  if (me.admin) { el("nav-usuarios").classList.remove("hidden"); carregarUsuarios(); }
+  if (!PODE_BOT) {
+    // só site: vai direto pro editor; nenhuma permissão: avisa
+    if (pode("site") && !me.admin) { location.href = "editor"; return; }
+    document.querySelectorAll("#nav .bot").forEach(b => b.classList.add("hidden"));
+    return mostrar(me.admin ? "usuarios" : "semperm");
+  }
+  const pedida = location.hash.slice(1);
+  mostrar(el("sec-" + pedida) && (pedida !== "usuarios" || me.admin) ? pedida : "restaurante");
+}
+async function carregarUsuarios() {
+  const j = await trata(await fetch(API + "/usuarios"));
+  if (!j.ok) return;
+  const box = el("lista_users"); box.innerHTML = "";
+  j.usuarios.forEach(u => {
+    const row = document.createElement("div"); row.className = "urow";
+    row.innerHTML = `<b></b>
+      <label class="chk"><input type="checkbox" class="p_bot"> Bot</label>
+      <label class="chk"><input type="checkbox" class="p_site"> Site</label>
+      <label class="chk tag-admin"><input type="checkbox" class="p_admin"> Superadmin</label>
+      <input type="password" class="rs_senha" placeholder="nova senha (6+)">
+      <button class="del" title="Trocar a senha" style="color:var(--gold)">🔑</button>
+      <button class="del" title="Remover usuário">✕</button>`;
+    row.querySelector("b").textContent = u.usuario;
+    row.querySelector(".p_bot").checked = u.perms.includes("bot");
+    row.querySelector(".p_site").checked = u.perms.includes("site");
+    row.querySelector(".p_admin").checked = u.admin;
+    row.querySelector(".p_bot").disabled = row.querySelector(".p_site").disabled = u.admin;  // admin já pode tudo
+    row.querySelectorAll("input[type=checkbox]").forEach(c => c.onchange = () => salvarPerms(u.usuario, row));
+    const [bSenha, bDel] = row.querySelectorAll(".del");
+    bSenha.onclick = () => redefinirSenha(u.usuario, row.querySelector(".rs_senha").value);
+    bDel.onclick = () => removerUsuario(u.usuario);
+    box.appendChild(row);
+  });
+}
+const permsMarcadas = pref => ["bot","site"].filter(p => el(pref + p).checked);
+async function postar(url, corpo) {
+  return trata(await fetch(API + url, { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(corpo || {}) }));
+}
+async function salvarPerms(usuario, row) {
+  const perms = ["bot","site"].filter(p => row.querySelector(".p_" + p).checked);
+  const j = await postar("/usuarios/permissoes", { usuario, perms, admin: row.querySelector(".p_admin").checked });
+  if (!j.ok) alert("Erro: " + (j.erro || ""));
+  carregarUsuarios();
+}
+async function gerarConvite() {
+  const st = el("cv_st"); aviso(st, "Gerando...");
+  const j = await postar("/convites", { perms: permsMarcadas("cv_") });
+  if (!j.ok) return aviso(st, "❌ " + (j.erro || "erro"), "err");
+  el("cv_url").value = j.url; el("cv_box").classList.remove("hidden"); aviso(st, "✅ Link pronto. Copie e mande pra pessoa.", "ok");
+}
+function copiarConvite() {
+  const inp = el("cv_url"); inp.select();
+  navigator.clipboard ? navigator.clipboard.writeText(inp.value) : document.execCommand("copy");
+  aviso(el("cv_st"), "✅ Copiado!", "ok");
+}
+async function criarUsuario() {
+  const st = el("nu_st"); aviso(st, "Criando...");
+  const j = await postar("/usuarios", { usuario: el("nu_user").value, senha: el("nu_senha").value,
+    admin: el("nu_admin").checked, perms: permsMarcadas("nu_") });
+  if (!j.ok) return aviso(st, "❌ " + (j.erro || "erro"), "err");
+  aviso(st, "✅ Usuário criado.", "ok"); el("nu_user").value = ""; el("nu_senha").value = ""; el("nu_admin").checked = false;
+  carregarUsuarios();
+}
+async function redefinirSenha(usuario, senha) {
+  const j = await postar("/usuarios/senha", { usuario, senha });
+  alert(j.ok ? `Senha de "${usuario}" trocada.` : "Erro: " + (j.erro || ""));
+  if (j.ok) carregarUsuarios();
+}
+async function removerUsuario(usuario) {
+  if (!confirm(`Remover o usuário "${usuario}"? Ele perde o acesso ao painel.`)) return;
+  const j = await postar("/usuarios/remover", { usuario });
+  if (!j.ok) alert("Erro: " + (j.erro || ""));
+  carregarUsuarios();
+}
+
 (async () => {
+  Object.keys(CATALOGOS).forEach(montarCatalogo);
   try {
     const cfg = await (await fetch(API + "/config")).json();
     fillForm(cfg.bot || {});
-    carregarMe();
-  } catch (e) { el("status").textContent = "Erro ao carregar: " + e; }
+    await carregarMe();
+  } catch (e) { if (!semLogin(e)) aviso(el("status"), "Erro ao carregar: " + e, "err"); }
 })();
 </script>
 </body>
