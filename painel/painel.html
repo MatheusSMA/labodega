@@ -85,6 +85,12 @@
     </div>
     <div class="card">
       <h2>Cardápio</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+        <input type="file" id="pdf_file" accept="application/pdf" style="flex:1;min-width:180px">
+        <button type="button" class="addbtn" style="width:auto;padding:9px 14px" onclick="importarPdf()">📄 Importar do PDF</button>
+      </div>
+      <small class="dim">Suba o cardápio em PDF e a IA preenche os itens, preços e descrições. Funciona com PDF de texto (não foto/escaneado). Confira e clique em Salvar.</small>
+      <div id="pdf_st" style="font-size:13px;margin:6px 0 12px"></div>
       <div id="cardapio"></div>
       <button type="button" class="addbtn" onclick="addCard()">+ Adicionar item</button>
     </div>
@@ -102,11 +108,15 @@
         <h2>Usuários do painel</h2>
         <p style="margin:0 0 12px;font-size:13px;color:#9aa0ab">Conectado como <b id="me_user">…</b></p>
         <div id="lista_users"></div>
-        <small class="dim">Redefinir senha: digite a nova senha na linha do usuário e clique em 🔑. Remover: ✕.</small>
+        <small class="dim">Marque o que cada um pode editar (salva na hora). Redefinir senha: digite a nova senha na linha do usuário e clique em 🔑. Remover: ✕.</small>
       </div>
       <div class="card">
         <h2>Convidar por link</h2>
         <p style="margin:0 0 12px;font-size:13px;color:#9aa0ab">Gere um link e mande pra pessoa (WhatsApp, e-mail...). Ela mesma escolhe o usuário e a senha. O link vale <b>7 dias</b> e funciona <b>uma única vez</b>.</p>
+        <div style="margin-bottom:10px">Quem entrar pelo link pode editar:
+          <label class="chk"><input type="checkbox" id="cv_bot" checked> Bot</label>
+          <label class="chk"><input type="checkbox" id="cv_site" checked> Site</label>
+        </div>
         <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="gerarConvite()">🔗 Gerar link de convite</button>
         <span id="cv_st" style="font-size:13px;margin-left:10px"></span>
         <div id="cv_box" style="display:none;gap:8px;margin-top:12px">
@@ -120,14 +130,20 @@
           <label class="field">Usuário (3+ letras)<input id="nu_user" placeholder="ex: labodega"></label>
           <label class="field">Senha (6+ caracteres)<input type="password" id="nu_senha"></label>
         </div>
-        <label class="chk"><input type="checkbox" id="nu_admin"> Administrador (gerencia usuários — normalmente só você)</label>
+        <div style="margin-bottom:10px">Pode editar:
+          <label class="chk"><input type="checkbox" id="nu_bot" checked> Bot</label>
+          <label class="chk"><input type="checkbox" id="nu_site" checked> Site</label>
+        </div>
+        <label class="chk"><input type="checkbox" id="nu_admin"> Superadmin (pode tudo e gerencia usuários — normalmente só você)</label>
         <button type="button" class="addbtn" style="width:auto;padding:9px 16px" onclick="criarUsuario()">➕ Criar usuário</button>
         <span id="nu_st" style="font-size:13px;margin-left:10px"></span>
       </div>
     </div>
   </div>
 
-  <div class="bar">
+  <div id="sem_perm" class="card hidden">Seu usuário ainda não tem permissão pra editar nada. Peça pro administrador liberar.</div>
+
+  <div class="bar" id="bar">
     <button class="save" onclick="salvar()">💾 Salvar</button>
     <span id="status"></span>
   </div>
@@ -153,6 +169,14 @@ async function carregarMe() {
   try {
     const me = await trata(await fetch(API + "/me"));
     if (!me.ok) return;
+    const pode = p => me.admin || (me.perms || []).includes(p);
+    if (!pode("site")) el("tab-site").classList.add("hidden");
+    if (!pode("bot")) {
+      // só site: vai direto pro editor; nenhuma permissão: avisa
+      if (pode("site")) { location.href = "editor"; return; }
+      ["tab-bot", "pane-bot", "bar"].forEach(x => el(x).classList.add("hidden"));
+      el("sem_perm").classList.remove("hidden");
+    }
     if (me.admin) {
       el("tab-users").classList.remove("hidden");
       el("admin_users").classList.remove("hidden");
@@ -167,18 +191,35 @@ async function carregarUsuarios() {
   if (!j.ok) return;
   const box = el("lista_users"); box.innerHTML = "";
   j.usuarios.forEach(u => {
-    const row = document.createElement("div"); row.className = "frow";
-    row.innerHTML = `<span style="flex:1;align-self:center;font-size:14px"><b>${esc(u.usuario)}</b>${u.admin?' <span style="color:#c89a3e;font-size:12px">admin</span>':""}</span>
+    const row = document.createElement("div"); row.className = "frow"; row.style.flexWrap = "wrap";
+    const tem = p => u.perms.includes(p) ? "checked" : "";
+    const trava = u.admin ? "disabled" : "";  // admin já pode tudo
+    row.innerHTML = `<span style="flex:1;align-self:center;font-size:14px;min-width:90px"><b>${esc(u.usuario)}</b></span>
+      <label class="chk"><input type="checkbox" class="p_bot" ${tem("bot")} ${trava}> Bot</label>
+      <label class="chk"><input type="checkbox" class="p_site" ${tem("site")} ${trava}> Site</label>
+      <label class="chk" style="color:#c89a3e"><input type="checkbox" class="p_admin" ${u.admin?"checked":""}> Admin</label>
       <input type="password" class="rs_senha" placeholder="nova senha (6+)" style="flex:1">
       <button type="button" class="del" style="color:#c89a3e" title="Redefinir senha" onclick="redefinirSenha('${esc(u.usuario)}', this)">🔑</button>
       <button type="button" class="del" title="Remover usuário" onclick="removerUsuario('${esc(u.usuario)}')">✕</button>`;
+    row.querySelectorAll("input[type=checkbox]").forEach(c => c.onchange = () => salvarPerms(u.usuario, row));
     box.appendChild(row);
   });
 }
 
+const permsMarcadas = pref => ["bot","site"].filter(p => el(pref + p).checked);
+
+async function salvarPerms(usuario, row) {
+  const perms = ["bot","site"].filter(p => row.querySelector(".p_" + p).checked);
+  const j = await trata(await fetch(API + "/usuarios/permissoes", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ usuario, perms, admin: row.querySelector(".p_admin").checked }) }));
+  if (!j.ok) alert("Erro: " + (j.erro||""));
+  carregarUsuarios();
+}
+
 async function gerarConvite() {
   const st = el("cv_st"); st.textContent = "gerando..."; st.style.color = "#9aa0ab";
-  const j = await trata(await fetch(API + "/convites", { method:"POST" }));
+  const j = await trata(await fetch(API + "/convites", { method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({ perms: permsMarcadas("cv_") }) }));
   if (j.ok) {
     st.textContent = "✅ link pronto — copie e mande!"; st.style.color = "#25D366";
     el("cv_url").value = j.url;
@@ -196,7 +237,8 @@ function copiarConvite() {
 async function criarUsuario() {
   const st = el("nu_st"); st.textContent = "criando..."; st.style.color = "#9aa0ab";
   const j = await trata(await fetch(API + "/usuarios", { method:"POST", headers:{"content-type":"application/json"},
-    body: JSON.stringify({ usuario: el("nu_user").value, senha: el("nu_senha").value, admin: el("nu_admin").checked }) }));
+    body: JSON.stringify({ usuario: el("nu_user").value, senha: el("nu_senha").value, admin: el("nu_admin").checked,
+      perms: permsMarcadas("nu_") }) }));
   if (j.ok) { st.textContent = "✅ criado!"; st.style.color = "#25D366"; el("nu_user").value=""; el("nu_senha").value=""; el("nu_admin").checked=false; carregarUsuarios(); }
   else { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; }
 }
@@ -258,7 +300,24 @@ function addFaq(q={p:"",r:""}) {
     <button type="button" class="del" onclick="this.parentElement.remove()">✕</button>`;
   el("faq").appendChild(row);
 }
+// texto cru do último PDF importado: o bot usa como reserva quando o item não bate
+let CARDAPIO_PDF = "";
+async function importarPdf() {
+  const st = el("pdf_st"), f = el("pdf_file").files[0];
+  if (!f) { st.textContent = "Escolha o PDF primeiro."; st.style.color = "#ffb454"; return; }
+  if (document.querySelectorAll("#cardapio .crow").length &&
+      !confirm("Isso SUBSTITUI os itens do cardápio pelos do PDF (só vale depois de Salvar). Continuar?")) return;
+  st.textContent = "🤖 Lendo o PDF e montando o cardápio... (pode levar até 1 minuto)"; st.style.color = "#9aa0ab";
+  const fd = new FormData(); fd.append("arquivo", f);
+  try {
+    const j = await trata(await fetch(API + "/cardapio-pdf", { method:"POST", body: fd }));
+    if (!j.ok) { st.textContent = "❌ " + (j.erro||"erro"); st.style.color = "#ff6b6b"; return; }
+    el("cardapio").innerHTML = ""; j.itens.forEach(addCard); CARDAPIO_PDF = j.texto || "";
+    st.textContent = `✅ ${j.itens.length} itens lidos. Confira abaixo e clique em Salvar.`; st.style.color = "#25D366";
+  } catch (e) { if (String(e).indexOf("sem login") < 0) { st.textContent = "❌ " + e; st.style.color = "#ff6b6b"; } }
+}
 function fillForm(b) {
+  CARDAPIO_PDF = b.cardapio_pdf || "";
   el("nome").value = b.nome||""; el("telefone").value = b.telefone||""; el("endereco").value = b.endereco||"";
   fillHorarios(b.horarios);
   const rv = b.reservas||{}; el("rv_aceita").checked = !!rv.aceita; el("rv_max").value = rv.max_pessoas||""; el("rv_ant").value = rv.antecedencia||"";
@@ -285,6 +344,7 @@ function collectBot() {
       preco: parseFloat(r.querySelector(".c_preco").value||"0")||0,
       desc: r.querySelector(".c_desc").value.trim(), tags: r.querySelector(".c_tags").value.trim() })).filter(it=>it.nome),
     faq: [...document.querySelectorAll("#faq .frow")].map(r=>({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q=>q.p),
+    cardapio_pdf: CARDAPIO_PDF,
   };
 }
 async function salvar() {

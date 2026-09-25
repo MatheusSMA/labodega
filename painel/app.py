@@ -13,11 +13,13 @@ Proteção de escrita: header x-panel-key == env PANEL_KEY (Setup Python App).
 """
 import glob
 import hashlib
+import io
 import json
 import os
 import re
 import secrets
 import time
+import urllib.request
 from flask import Flask, request, jsonify, Response, session, redirect, url_for
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +29,9 @@ CFG = os.path.join(DATA_DIR, "labodega.json")
 TEMPLATE = os.path.join(BASE, "site_template.html")
 PUBLIC_HTML = os.environ.get("PUBLIC_HTML_DIR") or os.path.expanduser("~/public_html")
 PANEL_KEY = os.environ.get("PANEL_KEY", "").strip()
+# IA que lê o cardápio em PDF (mesma chave do bot; configurar no Setup Python App)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b").strip()
 
 # --------------------------------------------------------------------------
 # Padrões — espelham exatamente o conteúdo atual do site (primeira publicação
@@ -891,11 +896,24 @@ def _hash_senha(senha, salt):
     return hashlib.pbkdf2_hmac("sha256", senha.encode(), bytes.fromhex(salt), 200_000).hex()
 
 
-def _criar_usuario(usuario, senha, admin=False):
+PERMS = ("bot", "site")
+
+
+def _perms_validas(lista):
+    return [p for p in PERMS if p in (lista or [])]
+
+
+def _criar_usuario(usuario, senha, admin=False, perms=PERMS):
     users = _users()
     salt = secrets.token_hex(16)
-    users[usuario] = {"salt": salt, "hash": _hash_senha(senha, salt), "admin": bool(admin)}
+    users[usuario] = {"salt": salt, "hash": _hash_senha(senha, salt), "admin": bool(admin),
+                      "perms": _perms_validas(perms)}
     _save_users(users)
+
+
+def _perms(u):
+    # admin pode tudo; quem é de antes das permissões (sem a chave) segue com bot e site
+    return list(PERMS) if u.get("admin") else u.get("perms", list(PERMS))
 
 
 def _login_valido(usuario, senha):
@@ -928,6 +946,22 @@ def _admin_ok():
     return bool(PANEL_KEY) and key == PANEL_KEY
 
 
+def _pode(perm):
+    """Admin (ou a chave técnica) pode tudo; os outros só o que foi marcado."""
+    if _admin_ok():
+        return True
+    return _logado() and perm in _perms(_users().get(session["user"]) or {})
+
+
+def _negado(perm):
+    """None se pode; senão a resposta de erro (401 sem login, 403 sem permissão)."""
+    if not _auth_ok():
+        return _json({"ok": False, "erro": "Faça login."}, 401)
+    if not _pode(perm):
+        return _json({"ok": False, "erro": "Seu usuário não tem permissão pra isso."}, 403)
+    return None
+
+
 @app.get("/")
 def painel():
     if not _logado():
@@ -940,6 +974,8 @@ def painel():
 def editor():
     if not _logado():
         return redirect(url_for("login_page"))
+    if not _pode("site"):
+        return redirect(url_for("painel"))
     return Response(render_site(load_cfg(), edit=True), mimetype="text/html")
 
 
@@ -997,7 +1033,8 @@ def api_me():
     if not _logado():
         return _json({"ok": False}, 401)
     u = _users().get(session["user"]) or {}
-    return _json({"ok": True, "usuario": session["user"], "admin": bool(u.get("admin"))})
+    return _json({"ok": True, "usuario": session["user"], "admin": bool(u.get("admin")),
+                  "perms": _perms(u)})
 
 
 @app.get("/api/usuarios")
@@ -1005,7 +1042,8 @@ def api_usuarios_listar():
     if not _admin_ok():
         return _json({"ok": False, "erro": "Só o administrador pode gerenciar usuários."}, 403)
     return _json({"ok": True, "usuarios": [
-        {"usuario": k, "admin": bool(v.get("admin"))} for k, v in _users().items()]})
+        {"usuario": k, "admin": bool(v.get("admin")), "perms": _perms(v)}
+        for k, v in _users().items()]})
 
 
 @app.post("/api/usuarios")
@@ -1019,7 +1057,26 @@ def api_usuarios_criar():
         return _json({"ok": False, "erro": "Usuário precisa de 3+ letras e senha de 6+ caracteres."}, 400)
     if usuario in _users():
         return _json({"ok": False, "erro": "Esse usuário já existe."}, 400)
-    _criar_usuario(usuario, senha, admin=bool(body.get("admin")))
+    _criar_usuario(usuario, senha, admin=bool(body.get("admin")), perms=body.get("perms"))
+    return _json({"ok": True})
+
+
+@app.post("/api/usuarios/permissoes")
+def api_usuarios_permissoes():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o administrador pode mudar permissões."}, 403)
+    body = request.get_json(force=True, silent=True) or {}
+    usuario = (body.get("usuario") or "").strip().lower()
+    users = _users()
+    if usuario not in users:
+        return _json({"ok": False, "erro": "Usuário não encontrado."}, 404)
+    admin = bool(body.get("admin"))
+    if usuario == session.get("user") and not admin:
+        return _json({"ok": False, "erro": "Você não pode tirar o seu próprio admin."}, 400)
+    users[usuario].update(admin=admin, perms=_perms_validas(body.get("perms")))
+    if not any(u.get("admin") for u in users.values()):
+        return _json({"ok": False, "erro": "Precisa sobrar pelo menos um administrador."}, 400)
+    _save_users(users)
     return _json({"ok": True})
 
 
@@ -1090,7 +1147,9 @@ def api_convites_criar():
     inv = {t: d for t, d in _invites().items()
            if not d.get("usado") and time.time() < d.get("expira", 0)}
     token = secrets.token_urlsafe(24)
-    inv[token] = {"criado": time.time(), "expira": time.time() + 7 * 24 * 3600, "usado": False}
+    perms = _perms_validas((request.get_json(force=True, silent=True) or {}).get("perms", PERMS))
+    inv[token] = {"criado": time.time(), "expira": time.time() + 7 * 24 * 3600, "usado": False,
+                  "perms": perms}
     _save_invites(inv)
     url = f"https://{request.host}{request.script_root}/registro?c={token}"
     return _json({"ok": True, "url": url})
@@ -1117,8 +1176,9 @@ def api_registro():
         return _json({"ok": False, "erro": "Usuário precisa de 3+ letras e senha de 6+ caracteres."}, 400)
     if usuario in _users():
         return _json({"ok": False, "erro": "Esse nome de usuário já existe. Escolha outro."}, 400)
-    _criar_usuario(usuario, senha, admin=False)  # convite cria usuário comum
     inv = _invites()
+    # convite cria usuário comum, com as permissões escolhidas ao gerar o link
+    _criar_usuario(usuario, senha, admin=False, perms=inv[token].get("perms", PERMS))
     inv[token]["usado"] = True
     _save_invites(inv)
     session.permanent = True
@@ -1162,8 +1222,12 @@ def api_save():
         body = request.get_json(force=True)
     except Exception:
         return _json({"ok": False, "erro": "JSON inválido"}, 400)
+    # cada seção ("bot", "site") exige a sua permissão; qualquer outra chave, só admin
+    body = {k: v for k, v in (body or {}).items() if _pode(k)}
+    if not body:
+        return _json({"ok": False, "erro": "Seu usuário não tem permissão pra isso."}, 403)
     cfg = load_cfg()
-    cfg.update(body or {})
+    cfg.update(body)
     save_cfg(cfg)
     ok, msg = publish_site(cfg)
     return _json({"ok": True, "publicado": ok, "msg": msg})
@@ -1171,8 +1235,8 @@ def api_save():
 
 @app.post("/api/save-visual")
 def api_save_visual():
-    if not _auth_ok():
-        return _json({"ok": False, "erro": "Chave do painel inválida."}, 401)
+    if (r := _negado("site")):
+        return r
     try:
         patch = request.get_json(force=True) or {}
     except Exception:
@@ -1190,8 +1254,8 @@ def api_save_visual():
 
 @app.post("/api/publish")
 def api_publish():
-    if not _auth_ok():
-        return _json({"ok": False, "erro": "Chave do painel inválida."}, 401)
+    if (r := _negado("site")):
+        return r
     ok, msg = publish_site(load_cfg())
     return _json({"ok": ok, "msg": msg})
 
@@ -1202,8 +1266,8 @@ SLOTS = {"logo", "hero", "drinks", "g1", "g2", "g3", "g4"}
 
 @app.post("/api/upload/<slot>")
 def api_upload(slot):
-    if not _auth_ok():
-        return _json({"ok": False, "erro": "Chave do painel inválida."}, 401)
+    if (r := _negado("site")):
+        return r
     if slot not in SLOTS:
         return _json({"ok": False, "erro": "Slot desconhecido."}, 400)
     f = request.files.get("arquivo")
@@ -1229,6 +1293,68 @@ def api_upload(slot):
     save_cfg(cfg)
     ok, msg = publish_site(cfg)
     return _json({"ok": True, "path": "/img/" + fname, "publicado": ok, "msg": msg})
+
+
+# ---------------- importar cardápio de PDF (IA) ----------------
+def _num(v):
+    try:
+        return float(str(v).replace("R$", "").replace(",", ".").strip())
+    except ValueError:
+        return 0.0
+
+
+def _ia_itens(texto):
+    """Pede pra IA (Groq) transformar o texto do cardápio em itens do painel."""
+    if not GROQ_API_KEY:
+        raise RuntimeError("falta a variável GROQ_API_KEY no Setup Python App do cPanel")
+    prompt = (
+        "Extraia TODOS os itens do cardápio abaixo. Responda APENAS com JSON no formato "
+        '{"itens": [{"categoria": "", "nome": "", "preco": 0, "desc": "", "tags": ""}]}. '
+        "preco é número com ponto decimal (0 se não houver). categoria é o título da seção "
+        "do cardápio (ex: Entradas, Pratos, Bebidas). desc é como o prato é feito / o que "
+        "acompanha, do jeito que está no texto. Em tags ponha 'vegano' ou 'vegetariano' só "
+        "se o texto indicar. NÃO invente itens, preços nem descrições.\n\n" + texto[:20000]
+    )
+    req = urllib.request.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=json.dumps({"model": GROQ_MODEL, "temperature": 0.1,
+                         "response_format": {"type": "json_object"},
+                         "messages": [{"role": "user", "content": prompt}]}).encode(),
+        # sem User-Agent próprio o Cloudflare da Groq recusa o urllib (erro 1010)
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json",
+                 "User-Agent": "labodega-painel"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        conteudo = json.load(r)["choices"][0]["message"]["content"]
+    itens = (json.loads(conteudo) or {}).get("itens") or []
+    return [{"categoria": str(i.get("categoria") or "").strip(),
+             "nome": str(i.get("nome") or "").strip(),
+             "preco": _num(i.get("preco", 0)),
+             "desc": str(i.get("desc") or "").strip(),
+             "tags": str(i.get("tags") or "").strip()}
+            for i in itens if isinstance(i, dict) and i.get("nome")]
+
+
+@app.post("/api/cardapio-pdf")
+def api_cardapio_pdf():
+    """Lê o texto do PDF e devolve os itens pra revisar no painel (não salva nada)."""
+    if (r := _negado("bot")):
+        return r
+    f = request.files.get("arquivo")
+    if not f:
+        return _json({"ok": False, "erro": "Escolha um arquivo PDF."}, 400)
+    try:
+        from pypdf import PdfReader
+        paginas = PdfReader(io.BytesIO(f.read())).pages
+        texto = "\n".join((p.extract_text() or "").strip() for p in paginas).strip()
+    except Exception as e:
+        return _json({"ok": False, "erro": f"Não consegui abrir o PDF: {e}"}, 400)
+    if not texto:
+        return _json({"ok": False, "erro": "Esse PDF não tem texto (parece foto ou escaneado)."}, 400)
+    try:
+        itens = _ia_itens(texto)
+    except Exception as e:
+        return _json({"ok": False, "erro": f"Erro na IA: {e}"}, 502)
+    return _json({"ok": True, "itens": itens, "texto": texto})
 
 
 if __name__ == "__main__":

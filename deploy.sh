@@ -48,6 +48,9 @@ fi
 # shellcheck disable=SC1090
 . "$VENV"
 cd "$PAINEL"
+# sempre: com tudo instalado o pip nem vai à rede, e assim a 1a rodada depois de
+# um push (que ainda executa o deploy.sh antigo) não deixa dependência faltando
+pip install -q -r requirements.txt || echo "aviso: pip install falhou"
 SAIDA=$(python -c "import app; ok, msg = app.publish_site(app.load_cfg()); print(ok, msg)")
 
 if [ "$COPIAR" = "1" ]; then
