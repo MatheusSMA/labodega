@@ -90,7 +90,7 @@ DEFAULT_SITE = {
     "emBreveMsg": "Estamos preparando algo especial. Volte logo!",
     "preview_slug": "teste01",  # URL da prévia: dominio.com.br/teste01
     "meta_title": "La Bodega · Rooftop · Pátio Petrópolis",
-    "meta_desc": "O rooftop mais charmoso de Petrópolis. Cozinha autoral, do almoço ao happy hour, no Pátio Petrópolis Shopping. Veja o cardápio e fale com a gente no Telegram.",
+    "meta_desc": "O rooftop mais charmoso de Petrópolis. Cozinha autoral, do almoço ao happy hour, no Pátio Petrópolis Shopping. Veja o cardápio e fale com a gente no WhatsApp.",
     "hero": {
         "titulo": "Existem lugares para uma refeição, e lugares onde você <em>vive uma experiência.</em><br>Bem-vindo ao La Bodega.",
         "sub": "Rooftop · Pátio Petrópolis",
@@ -135,7 +135,8 @@ DEFAULT_SITE = {
         "obs_horario": "Horários seguem o funcionamento do shopping e podem variar em datas especiais. Confirme o dia com o nosso bot.",
     },
     "contato": {"tel": "(24) 2017-9899", "email": "labodegapetropolis@gmail.com", "insta": "labodegapetropolis"},
-    "bot_link": "https://t.me/labodegapatio_bot?start=qr",
+    # número do bot no WhatsApp; ?text= já deixa a primeira mensagem pronta pro cliente
+    "bot_link": "https://wa.me/5524992193358?text=oi",
     "img": {"logo": "/img/logo.png", "hero": "/img/hero-bg.jpg", "drinks": "/img/drinks.jpg",
             "g1": "/img/hero-bg.jpg", "g2": "/img/drinks.jpg",
             "g3": "/img/hero-bg.jpg", "g4": "/img/drinks.jpg"},
@@ -155,18 +156,18 @@ DEFAULT_SITE = {
         "btn_cardapio": "Ver cardápio",
         "btn_falar": "Falar com a gente",
         "btn_carta": "Ver a carta completa",
-        "btn_conversa": "Abrir conversa no Telegram",
+        "btn_conversa": "Abrir conversa no WhatsApp",
         "maps_txt": "Abrir no Google Maps →",
-        "conf_horario": "Confirmar horário no Telegram →",
+        "conf_horario": "Confirmar horário no WhatsApp →",
         "bot_h2": "O La Bodega <em>no seu bolso</em>",
-        "bot_p": "Aponte a câmera pro código ou toque no botão. Você cai direto numa conversa com o nosso atendente no Telegram — sem instalar nada além do app.",
+        "bot_p": "Aponte a câmera pro código ou toque no botão. Você cai direto numa conversa com o nosso atendente no WhatsApp.",
         "bot_f1": "Ver o cardápio e as promoções do dia",
         "bot_f2": "Fazer reserva e tirar dúvidas",
         "bot_f3": "Conferir horários e como chegar",
         "qr_cap": "Aponte a câmera",
         "qr_sub": "Leva direto pro nosso atendimento",
-        "qr_handle": "t.me/labodegapatio_bot",
-        "canal": "Telegram",
+        "qr_handle": "WhatsApp (24) 99219-3358",
+        "canal": "WhatsApp",
         "direitos": "Todos os direitos reservados.",
         "foot_tag": "Petrópolis · Cidade Imperial",
         "nav_casa": "A casa",
@@ -280,6 +281,14 @@ def load_cfg():
     if "bot" not in cfg:
         cfg["bot"] = DEFAULT_BOT
         migrated = True
+    if "t.me/" in cfg["site"].get("bot_link", ""):
+        # set/2026: atendimento saiu do Telegram pro WhatsApp; os textos salvos vêm junto
+        cfg["site"]["bot_link"] = DEFAULT_SITE["bot_link"]
+        cfg["site"]["meta_desc"] = cfg["site"].get("meta_desc", "").replace("Telegram", "WhatsApp")
+        textos = cfg["site"].setdefault("textos", {})
+        for k in ("btn_conversa", "conf_horario", "bot_p", "qr_handle", "canal"):
+            textos[k] = DEFAULT_SITE["textos"][k]
+        migrated = True
     if migrated:
         save_cfg(cfg)
     return cfg
@@ -387,6 +396,15 @@ def _tel_link(tel):
     return "+" + dig if dig else ""
 
 
+def _qr_svg(link):
+    """QR code do link do bot, gerado a cada publicação (troca o número, o QR acompanha)."""
+    try:
+        import segno  # import aqui: no deploy o pip instala logo depois do app reiniciar
+    except ImportError:
+        return ""
+    return segno.make(link, error="m").svg_inline(dark="#1b1916", border=2, omitsize=True)
+
+
 def render_site(cfg, edit=False, preview=False):
     site = _merge(DEFAULT_SITE, cfg.get("site"))
     bot = _merge(DEFAULT_BOT, cfg.get("bot"))
@@ -398,9 +416,11 @@ def render_site(cfg, edit=False, preview=False):
     preco_drink = (site["drink"].get("preco") or "0,00").replace("R$", "").strip()
     d_int, _, d_cents = preco_drink.partition(",")
     endereco_lines = [l.strip() for l in (site["visita"].get("endereco") or "").splitlines() if l.strip()]
-    # link do bot que já abre no fluxo de reserva (deep link ?start=reserva)
+    # link do bot que já abre no fluxo de reserva
     bot_link = site["bot_link"]
-    if "start=" in bot_link:
+    if "wa.me/" in bot_link:  # WhatsApp: mensagem pronta "reservar" = opção de reserva do bot
+        link_reserva = bot_link.split("?")[0] + "?text=reservar"
+    elif "start=" in bot_link:  # Telegram: deep link ?start=reserva
         link_reserva = re.sub(r"start=[^&]*", "start=reserva", bot_link)
     else:
         link_reserva = bot_link + ("&" if "?" in bot_link else "?") + "start=reserva"
@@ -410,6 +430,7 @@ def render_site(cfg, edit=False, preview=False):
         "NOME": bot.get("nome", "La Bodega"),
         "LINK_BOT": site["bot_link"],
         "LINK_BOT_RESERVA": link_reserva,
+        "QR_SVG": _qr_svg(site["bot_link"]),
         "LINK_REVIEWS": site.get("reviews_link", ""),
         "IMG_LOGO": site["img"].get("logo", "/img/logo.png"),
         "IMG_HERO": site["img"].get("hero", "/img/hero-bg.jpg"),
