@@ -20,6 +20,7 @@ import secrets
 import sqlite3
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from flask import Flask, request, jsonify, Response, session, redirect, url_for
 
@@ -34,6 +35,9 @@ PANEL_KEY = os.environ.get("PANEL_KEY", "").strip()
 # Hoje é o único modelo da Groq que lê imagem; se aposentarem, troque pela env.
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip()
+# aba Custos: token de usuário do sistema (o mesmo do bot) e a conta do WhatsApp
+META_TOKEN = os.environ.get("WHATSAPP_TOKEN", "").strip()
+WABA_ID = os.environ.get("WHATSAPP_WABA_ID", "1120624903636686").strip()
 # chave que o bot usa pra gravar as conversas (a mesma vai no .env do bot); vazia = desligado
 CONVERSAS_KEY = os.environ.get("CONVERSAS_KEY", "").strip()
 
@@ -1403,7 +1407,7 @@ def api_cardapio_pagina():
 # ---------------- conversas do WhatsApp (aba Conversas, só superadmin) ----------------
 # A Meta não guarda o histórico de um número da API: o bot manda cada mensagem pra cá.
 CONVERSAS_DB = os.path.join(DATA_DIR, "conversas.db")
-CONVERSAS_DIAS = 180  # LGPD: histórico some depois disso (está na política de privacidade)
+CONVERSAS_DIAS = 3  # LGPD: histórico some depois disso (está na política de privacidade)
 
 
 def _db():
@@ -1411,6 +1415,9 @@ def _db():
     con.execute("CREATE TABLE IF NOT EXISTS msgs (id INTEGER PRIMARY KEY, ts REAL, numero TEXT,"
                 " nome TEXT, direcao TEXT, texto TEXT)")
     con.execute("CREATE INDEX IF NOT EXISTS msgs_numero ON msgs (numero, ts)")
+    # apaga o vencido a cada acesso, gravando ou lendo: nada passa do prazo esperando mensagem nova
+    with con:
+        con.execute("DELETE FROM msgs WHERE ts < ?", (time.time() - CONVERSAS_DIAS * 86400,))
     return con
 
 
@@ -1429,7 +1436,6 @@ def api_conversas_registrar():
         con.execute("INSERT INTO msgs (ts, numero, nome, direcao, texto) VALUES (?, ?, ?, ?, ?)",
                     (time.time(), numero, str(b.get("nome") or "")[:80], b["direcao"],
                      str(b.get("texto") or "")[:5000]))
-        con.execute("DELETE FROM msgs WHERE ts < ?", (time.time() - CONVERSAS_DIAS * 86400,))
     con.close()
     return _json({"ok": True})
 
@@ -1459,6 +1465,40 @@ def api_conversa(numero):
                          (numero,)).fetchall()
     con.close()
     return _json({"ok": True, "msgs": [{"ts": ts, "direcao": d, "texto": t} for ts, d, t in reversed(linhas)]})
+
+
+# ---------------- custos do WhatsApp (aba Custos, só superadmin) ----------------
+_custos_cache = {"t": 0.0, "resp": None}
+
+
+@app.get("/api/custos")
+def api_custos():
+    """Mensagens e custo por dia dos últimos 90 dias, direto da Meta (pricing_analytics)."""
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o superadmin vê os custos."}, 403)
+    if not META_TOKEN:
+        return _json({"ok": False, "erro": "falta a variável WHATSAPP_TOKEN no Setup Python App do cPanel"}, 500)
+    agora = time.time()
+    if _custos_cache["resp"] and agora - _custos_cache["t"] < 600:  # a Meta atualiza devagar
+        return _json(_custos_cache["resp"])
+    fim = int(agora)
+    campos = (f"currency,pricing_analytics.start({fim - 90 * 86400}).end({fim}).granularity(DAILY)"
+              '.dimensions(["PRICING_CATEGORY","PRICING_TYPE"])')
+    req = urllib.request.Request(
+        f"https://graph.facebook.com/v25.0/{WABA_ID}?fields=" + urllib.parse.quote(campos, safe="(),."),
+        headers={"Authorization": f"Bearer {META_TOKEN}", "User-Agent": "labodega-painel"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            dados = json.load(r)
+    except urllib.error.HTTPError as e:
+        return _json({"ok": False, "erro": f"Meta ({e.code}): {e.read()[:300].decode(errors='ignore')}"}, 502)
+    except Exception as e:
+        return _json({"ok": False, "erro": f"Meta: {e}"}, 502)
+    pontos = [p for bloco in (dados.get("pricing_analytics") or {}).get("data", [])
+              for p in bloco.get("data_points", [])]
+    resp = {"ok": True, "moeda": dados.get("currency", ""), "pontos": pontos}
+    _custos_cache.update(t=agora, resp=resp)
+    return _json(resp)
 
 
 CATALOGOS = {"cardapio", "drinks"}
