@@ -17,6 +17,7 @@ import json
 import os
 import re
 import secrets
+import sqlite3
 import time
 import urllib.error
 import urllib.request
@@ -33,6 +34,8 @@ PANEL_KEY = os.environ.get("PANEL_KEY", "").strip()
 # Hoje é o único modelo da Groq que lê imagem; se aposentarem, troque pela env.
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b").strip()
+# chave que o bot usa pra gravar as conversas (a mesma vai no .env do bot); vazia = desligado
+CONVERSAS_KEY = os.environ.get("CONVERSAS_KEY", "").strip()
 
 # --------------------------------------------------------------------------
 # Padrões — espelham exatamente o conteúdo atual do site (primeira publicação
@@ -991,6 +994,9 @@ def _negado(perm):
 def painel():
     if not _logado():
         return redirect(url_for("login_page"))
+    if not _pode("bot") and _pode("site"):
+        # só site: nem entrega a página do painel (antes piscava a tela do bot)
+        return redirect(url_for("editor"))
     with open(os.path.join(BASE, "painel.html"), encoding="utf-8") as f:
         return Response(f.read(), mimetype="text/html")
 
@@ -1392,6 +1398,67 @@ def api_cardapio_pagina():
     if itens is None:
         return _json({"ok": False, "cortado": True})  # o navegador manda em duas metades
     return _json({"ok": True, "itens": itens})
+
+
+# ---------------- conversas do WhatsApp (aba Conversas, só superadmin) ----------------
+# A Meta não guarda o histórico de um número da API: o bot manda cada mensagem pra cá.
+CONVERSAS_DB = os.path.join(DATA_DIR, "conversas.db")
+CONVERSAS_DIAS = 180  # LGPD: histórico some depois disso (está na política de privacidade)
+
+
+def _db():
+    con = sqlite3.connect(CONVERSAS_DB)
+    con.execute("CREATE TABLE IF NOT EXISTS msgs (id INTEGER PRIMARY KEY, ts REAL, numero TEXT,"
+                " nome TEXT, direcao TEXT, texto TEXT)")
+    con.execute("CREATE INDEX IF NOT EXISTS msgs_numero ON msgs (numero, ts)")
+    return con
+
+
+@app.post("/api/conversas/registrar")
+def api_conversas_registrar():
+    """O bot manda cada mensagem: a do cliente ("in") e a resposta dele ("out")."""
+    chave = request.headers.get("x-conversas-key", "")
+    if not CONVERSAS_KEY or not secrets.compare_digest(chave, CONVERSAS_KEY):
+        return _json({"ok": False, "erro": "chave inválida"}, 401)
+    b = request.get_json(force=True, silent=True) or {}
+    numero = re.sub(r"\D", "", str(b.get("numero") or ""))[:20]
+    if not numero or b.get("direcao") not in ("in", "out"):
+        return _json({"ok": False, "erro": "dados inválidos"}, 400)
+    con = _db()
+    with con:
+        con.execute("INSERT INTO msgs (ts, numero, nome, direcao, texto) VALUES (?, ?, ?, ?, ?)",
+                    (time.time(), numero, str(b.get("nome") or "")[:80], b["direcao"],
+                     str(b.get("texto") or "")[:5000]))
+        con.execute("DELETE FROM msgs WHERE ts < ?", (time.time() - CONVERSAS_DIAS * 86400,))
+    con.close()
+    return _json({"ok": True})
+
+
+@app.get("/api/conversas")
+def api_conversas():
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o superadmin vê as conversas."}, 403)
+    con = _db()
+    linhas = con.execute(
+        "SELECT numero, MAX(ts), COUNT(*),"
+        " (SELECT nome FROM msgs n WHERE n.numero = m.numero AND nome != '' ORDER BY ts DESC LIMIT 1),"
+        " (SELECT texto FROM msgs u WHERE u.numero = m.numero ORDER BY ts DESC LIMIT 1)"
+        " FROM msgs m GROUP BY numero ORDER BY MAX(ts) DESC LIMIT 300").fetchall()
+    con.close()
+    return _json({"ok": True, "conversas": [
+        {"numero": n, "ts": ts, "total": total, "nome": nome or "", "ultima": ultima or ""}
+        for n, ts, total, nome, ultima in linhas]})
+
+
+@app.get("/api/conversas/<numero>")
+def api_conversa(numero):
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o superadmin vê as conversas."}, 403)
+    con = _db()
+    linhas = con.execute("SELECT ts, direcao, texto FROM msgs WHERE numero = ? ORDER BY ts DESC LIMIT 500",
+                         (numero,)).fetchall()
+    con.close()
+    return _json({"ok": True, "msgs": [{"ts": ts, "direcao": d, "texto": t} for ts, d, t in reversed(linhas)]})
 
 
 CATALOGOS = {"cardapio", "drinks"}

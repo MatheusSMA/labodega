@@ -92,6 +92,24 @@
   .urow input[type=password] { flex:1; min-width:160px; }
   .tag-admin { color:var(--gold); }
 
+  .chat { display:grid; grid-template-columns:300px 1fr; padding:0; height:calc(100vh - 250px); min-height:420px; overflow:hidden; }
+  .chat-lista { border-right:1px solid var(--line); display:flex; flex-direction:column; min-height:0; }
+  .chat-lista input { border-radius:0; border-width:0 0 1px; }
+  #conv_lista { overflow-y:auto; }
+  .conv { cursor:pointer; padding:12px 16px; border-bottom:1px solid var(--line); }
+  .conv:hover, .conv.on { background:var(--ink-3); }
+  .conv b { display:block; font-size:14.5px; } .conv small { color:var(--cream-dim); }
+  .conv p { color:var(--cream-dim); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chat-thread { display:flex; flex-direction:column; min-height:0; }
+  .chat-head { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--line); font-weight:600; }
+  .chat-head .voltar { display:none; padding:6px 12px; }
+  .msgs { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:8px; }
+  .b { max-width:78%; padding:9px 13px; border-radius:12px; white-space:pre-wrap; word-wrap:break-word; font-size:14px; }
+  .b small { display:block; margin-top:4px; font-size:11px; color:var(--cream-dim); text-align:right; }
+  .b.in { align-self:flex-start; background:var(--ink-3); border-top-left-radius:3px; }
+  .b.out { align-self:flex-end; background:rgba(200,154,62,.16); border:1px solid rgba(200,154,62,.3); border-top-right-radius:3px; }
+  .vazio { color:var(--cream-dim); padding:18px; }
+
   .savebar { position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex; justify-content:flex-end; align-items:center; gap:16px; padding:14px 24px; background:rgba(27,25,22,.97); border-top:1px solid var(--line); }
   #status { font-size:14px; }
 
@@ -108,6 +126,9 @@
     .faqrow { grid-template-columns:1fr; }
     .faqrow .del { justify-self:end; }
     .hrow { grid-template-columns:1fr auto auto auto; gap:8px; }
+    .chat { grid-template-columns:1fr; height:calc(100vh - 230px); }
+    .chat .chat-thread { display:none; } .chat.aberto .chat-thread { display:flex; } .chat.aberto .chat-lista { display:none; }
+    .chat-head .voltar { display:inline-block; }
     .savebar { padding:12px 16px; }
     .savebar .btn { flex:1; }
   }
@@ -128,12 +149,14 @@
     <button data-sec="drinks" class="bot">🍹 Drinks</button>
     <button data-sec="faq" class="bot">💬 Perguntas frequentes</button>
     <div class="sep"></div>
+    <button data-sec="conversas" id="nav-conversas" class="hidden">📨 Conversas</button>
     <button data-sec="usuarios" id="nav-usuarios" class="hidden">👥 Usuários</button>
     <a href="editor" id="nav-site">✏️ Editar o site</a>
   </nav>
 
   <main>
-    <section class="sec" id="sec-restaurante">
+    <!-- tudo começa escondido: só aparece o que o usuário pode ver, depois de /api/me -->
+    <section class="sec hidden" id="sec-restaurante">
       <h2>Restaurante</h2>
       <p class="hint">O que o bot diz quando perguntam quem somos e onde fica.</p>
       <div class="card grid">
@@ -187,6 +210,21 @@
       </div>
     </section>
 
+    <section class="sec hidden" id="sec-conversas">
+      <h2>Conversas</h2>
+      <p class="hint">O que os clientes mandam no WhatsApp e o que o bot responde. Só o superadmin vê. Ficam guardadas por 6 meses.</p>
+      <div class="card chat" id="chat">
+        <div class="chat-lista">
+          <input type="search" placeholder="Buscar nome ou número..." oninput="filtrarConversas(this.value)">
+          <div id="conv_lista"></div>
+        </div>
+        <div class="chat-thread">
+          <div class="chat-head"><button class="btn ghost voltar" onclick="fecharConversa()">←</button><span id="conv_head">Escolha uma conversa</span></div>
+          <div class="msgs" id="conv_msgs"></div>
+        </div>
+      </div>
+    </section>
+
     <section class="sec hidden" id="sec-usuarios">
       <h2>Usuários</h2>
       <p class="hint">Quem entra no painel e o que cada um pode editar. Superadmin pode tudo.</p>
@@ -231,7 +269,7 @@
   </main>
 </div>
 
-<div class="savebar" id="bar">
+<div class="savebar hidden" id="bar">
   <span id="status"></span>
   <button class="btn primary" onclick="salvar()">Salvar alterações</button>
 </div>
@@ -256,7 +294,8 @@ const semLogin = e => String(e).indexOf("sem login") >= 0;
 function mostrar(sec) {
   document.querySelectorAll(".sec").forEach(s => s.classList.toggle("hidden", s.id !== "sec-" + sec));
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.sec === sec));
-  el("bar").classList.toggle("hidden", !PODE_BOT || sec === "usuarios");
+  el("bar").classList.toggle("hidden", !PODE_BOT || sec === "usuarios" || sec === "conversas");
+  if (sec === "conversas") carregarConversas();
   history.replaceState(null, "", "#" + sec);
   scrollTo(0, 0);
   el("sec-" + sec).querySelectorAll("textarea").forEach(ajustar);  // oculta, a caixa não tinha altura
@@ -513,6 +552,58 @@ async function salvar() {
   } catch (e) { if (!semLogin(e)) aviso(st, "❌ " + e, "err"); }
 }
 
+// ---------------- conversas (só superadmin) ----------------
+let CONVERSAS = [], CONV_ABERTA = "";
+const fone = n => n.length === 13 ? `+${n.slice(0,2)} ${n.slice(2,4)} ${n.slice(4,9)}-${n.slice(9)}` : "+" + n;
+const quando = ts => new Date(ts * 1000).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+// *negrito* e _itálico_ do WhatsApp, depois de escapar o HTML (o texto vem do cliente)
+const zap = t => t.replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]))
+  .replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/(^|\s)_([^_\n]+)_/g, "$1<i>$2</i>");
+async function carregarConversas() {
+  const j = await trata(await fetch(API + "/conversas"));
+  if (!j.ok) return;
+  CONVERSAS = j.conversas; filtrarConversas(document.querySelector("#sec-conversas input[type=search]").value);
+  if (CONV_ABERTA) abrirConversa(CONV_ABERTA, false);
+}
+function filtrarConversas(q) {
+  q = (q || "").toLowerCase();
+  const box = el("conv_lista"); box.innerHTML = "";
+  const lista = CONVERSAS.filter(c => !q || (c.nome + " " + c.numero).toLowerCase().includes(q));
+  if (!lista.length) box.innerHTML = `<div class="vazio">${CONVERSAS.length ? "Nada encontrado." : "Nenhuma conversa ainda."}</div>`;
+  lista.forEach(c => {
+    const d = document.createElement("div"); d.className = "conv" + (c.numero === CONV_ABERTA ? " on" : "");
+    d.dataset.numero = c.numero;
+    d.innerHTML = "<b></b><small></small><p></p>";
+    d.querySelector("b").textContent = c.nome || fone(c.numero);
+    d.querySelector("small").textContent = (c.nome ? fone(c.numero) + " · " : "") + quando(c.ts);
+    d.querySelector("p").textContent = c.ultima;
+    d.onclick = () => abrirConversa(c.numero, true);
+    box.appendChild(d);
+  });
+}
+async function abrirConversa(numero, rolar) {
+  CONV_ABERTA = numero; el("chat").classList.add("aberto");
+  document.querySelectorAll(".conv").forEach(d => d.classList.toggle("on", d.dataset.numero === numero));
+  const c = CONVERSAS.find(x => x.numero === numero) || { nome:"", numero };
+  el("conv_head").textContent = c.nome ? `${c.nome} · ${fone(numero)}` : fone(numero);
+  const j = await trata(await fetch(API + "/conversas/" + numero));
+  if (!j.ok) return;
+  const box = el("conv_msgs"), noFim = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  box.innerHTML = "";
+  j.msgs.forEach(m => {
+    const b = document.createElement("div"); b.className = "b " + m.direcao;
+    b.innerHTML = zap(m.texto); const s = document.createElement("small");
+    s.textContent = (m.direcao === "out" ? "Bot · " : "") + quando(m.ts); b.appendChild(s); box.appendChild(b);
+  });
+  if (rolar || noFim) box.scrollTop = box.scrollHeight;  // não puxa pro fim se a pessoa está lendo lá em cima
+}
+function fecharConversa() {  // celular: volta pra lista
+  CONV_ABERTA = ""; el("chat").classList.remove("aberto");
+  document.querySelectorAll(".conv").forEach(d => d.classList.remove("on"));
+}
+// atualiza sozinho enquanto a aba está aberta
+setInterval(() => { if (!el("sec-conversas").classList.contains("hidden")) carregarConversas(); }, 15000);
+
 // ---------------- usuários ----------------
 let PODE_BOT = true;
 async function carregarMe() {
@@ -522,7 +613,9 @@ async function carregarMe() {
   const pode = p => me.admin || (me.perms || []).includes(p);
   PODE_BOT = pode("bot");
   if (!pode("site")) el("nav-site").classList.add("hidden");
-  if (me.admin) { el("nav-usuarios").classList.remove("hidden"); carregarUsuarios(); }
+  if (me.admin) {
+    el("nav-usuarios").classList.remove("hidden"); el("nav-conversas").classList.remove("hidden"); carregarUsuarios();
+  }
   if (!PODE_BOT) {
     // só site: vai direto pro editor; nenhuma permissão: avisa
     if (pode("site") && !me.admin) { location.href = "editor"; return; }
