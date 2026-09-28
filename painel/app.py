@@ -615,12 +615,15 @@ def render_embreve(cfg):
   h1{{font-family:"Playfair Display",serif;font-style:italic;font-weight:500;font-size:clamp(2rem,6vw,3.2rem);color:#e2bd62;margin-bottom:16px}}
   p{{color:#ada592;max-width:440px;font-size:1rem;line-height:1.6}}
   .brand{{margin-top:40px;font-size:.8rem;letter-spacing:.3em;text-transform:uppercase;color:#ada592}}
+  .priv{{margin-top:18px;font-size:.75rem;color:#ada592}}
+  .priv a{{color:#c89a3e}}
 </style></head><body>
   <img src="{logo}" alt="{nome}">
   <div class="eyebrow">Em breve</div>
   <h1>{nome}</h1>
   <p>{msg}</p>
   <div class="brand">{sub}</div>
+  <div class="priv"><a href="/privacidade.html">Política de Privacidade</a></div>
 {_avisos_html(site)}</body></html>"""
 
 
