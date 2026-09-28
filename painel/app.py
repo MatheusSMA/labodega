@@ -463,6 +463,10 @@ def _avisos_html(site):
 """
 
 
+MSG_SITE = "Olá! Vim pelo site e quero ver as opções 👋"
+MSG_SITE_RESERVA = "Olá! Quero reservar uma mesa 🍷"
+
+
 def _qr_svg(link):
     """QR code do link do bot, gerado a cada publicação (troca o número, o QR acompanha)."""
     try:
@@ -483,10 +487,13 @@ def render_site(cfg, edit=False, preview=False):
     preco_drink = (site["drink"].get("preco") or "0,00").replace("R$", "").strip()
     d_int, _, d_cents = preco_drink.partition(",")
     endereco_lines = [l.strip() for l in (site["visita"].get("endereco") or "").splitlines() if l.strip()]
-    # link do bot que já abre no fluxo de reserva
+    # links do bot: no WhatsApp a conversa já abre com uma mensagem pronta, que o bot
+    # reconhece (mesmas frases em BotWhatsapp/telegram_bot/conversa.py): menu ou reserva
     bot_link = site["bot_link"]
-    if "wa.me/" in bot_link:  # WhatsApp: mensagem pronta "reservar" = opção de reserva do bot
-        link_reserva = bot_link.split("?")[0] + "?text=reservar"
+    if "wa.me/" in bot_link:
+        base = bot_link.split("?")[0]
+        bot_link = base + "?text=" + urllib.parse.quote(MSG_SITE)
+        link_reserva = base + "?text=" + urllib.parse.quote(MSG_SITE_RESERVA)
     elif "start=" in bot_link:  # Telegram: deep link ?start=reserva
         link_reserva = re.sub(r"start=[^&]*", "start=reserva", bot_link)
     else:
@@ -495,9 +502,9 @@ def render_site(cfg, edit=False, preview=False):
         "META_TITLE": site["meta_title"],
         "META_DESC": site["meta_desc"],
         "NOME": bot.get("nome", "La Bodega"),
-        "LINK_BOT": site["bot_link"],
+        "LINK_BOT": bot_link,
         "LINK_BOT_RESERVA": link_reserva,
-        "QR_SVG": _qr_svg(site["bot_link"]),
+        "QR_SVG": _qr_svg(bot_link),
         "LINK_REVIEWS": site.get("reviews_link", ""),
         "IMG_LOGO": site["img"].get("logo", "/img/logo.png"),
         "IMG_HERO": site["img"].get("hero", "/img/hero-bg.jpg"),
