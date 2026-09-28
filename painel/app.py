@@ -86,6 +86,8 @@ DEFAULT_BOT = {
     "pagamento": ["Pix", "Cartão de crédito", "Cartão de débito", "Dinheiro"],
     "cardapio": MENU_REAL,
     "drinks": [],
+    # feriados / dias com horário diferente: [{"data": "AAAA-MM-DD", "abre", "ini", "fim", "motivo"}]
+    "datas_especiais": [],
     # PDF que o bot manda pro cliente, por catálogo: {"cardapio": url, "drinks": url}
     "pdfs": {},
     "faq": [],
@@ -96,6 +98,8 @@ DEFAULT_SITE = {
     "emBreve": False,
     "emBreveMsg": "Estamos preparando algo especial. Volte logo!",
     "preview_slug": "teste01",  # URL da prévia: dominio.com.br/teste01
+    # popups do site: [{"id", "titulo", "texto", "inicio": "AAAA-MM-DD", "fim": "AAAA-MM-DD"}]
+    "avisos": [],
     "meta_title": "La Bodega · Rooftop · Pátio Petrópolis",
     "meta_desc": "O rooftop mais charmoso de Petrópolis. Cozinha autoral, do almoço ao happy hour, no Pátio Petrópolis Shopping. Veja o cardápio e fale com a gente no WhatsApp.",
     "hero": {
@@ -403,6 +407,55 @@ def _tel_link(tel):
     return "+" + dig if dig else ""
 
 
+def _avisos_html(site):
+    """Popup de aviso no site (feriado, horário especial...), entre as datas de início e fim.
+
+    O site é estático, então quem decide se o aviso está no ar é o navegador do visitante,
+    pela data dele. Aviso já encerrado nem entra na página.
+    """
+    ontem = time.strftime("%Y-%m-%d", time.localtime(time.time() - 86400))  # folga de fuso
+    avisos = [{"id": str(a.get("id") or ""), "titulo": a.get("titulo") or "", "texto": a.get("texto") or "",
+               "inicio": a.get("inicio") or "0000-00-00", "fim": a.get("fim") or "9999-12-31"}
+              for a in site.get("avisos") or [] if (a.get("titulo") or a.get("texto")) and (a.get("fim") or "9999") >= ontem]
+    if not avisos:
+        return ""
+    dados = json.dumps(avisos, ensure_ascii=False).replace("</", "<\\/")
+    return """<style>
+.aviso-fundo{position:fixed;inset:0;z-index:9999;background:rgba(10,9,8,.74);display:flex;align-items:center;justify-content:center;padding:20px}
+.aviso-box{max-width:440px;width:100%;background:#23201c;color:#e8e1d0;border:1px solid rgba(200,154,62,.45);border-radius:16px;padding:32px 26px 26px;text-align:center;font-family:"Montserrat",system-ui,sans-serif;box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.aviso-box small{display:block;font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:#c89a3e;font-weight:600;margin-bottom:12px}
+.aviso-box h3{font-family:"Playfair Display",Georgia,serif;font-size:1.6rem;line-height:1.2;margin-bottom:12px;color:#e2bd62}
+.aviso-box p{color:#ada592;line-height:1.6;white-space:pre-line;margin-bottom:22px}
+.aviso-box button{cursor:pointer;background:#c89a3e;color:#1b1916;border:0;border-radius:999px;padding:12px 30px;font:600 .78rem "Montserrat",sans-serif;letter-spacing:.14em;text-transform:uppercase}
+</style>
+<script>
+(function () {
+  var avisos = """ + dados + """;
+  var d = new Date(), hoje = d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
+  function visto(id) { try { return localStorage.getItem("aviso-" + id); } catch (e) { return null; } }
+  function proximo() {
+    var a = avisos.filter(function (x) { return x.inicio <= hoje && hoje <= x.fim && !visto(x.id); })[0];
+    if (!a) return;
+    var fundo = document.createElement("div"); fundo.className = "aviso-fundo";
+    fundo.innerHTML = '<div class="aviso-box" role="dialog" aria-modal="true"><small>Aviso</small><h3></h3><p></p><button type="button">Entendi</button></div>';
+    fundo.querySelector("h3").textContent = a.titulo; fundo.querySelector("p").textContent = a.texto;
+    if (!a.titulo) fundo.querySelector("h3").remove();
+    function fechar() {
+      try { localStorage.setItem("aviso-" + a.id, "1"); } catch (e) {}
+      fundo.remove(); document.removeEventListener("keydown", esc); proximo();
+    }
+    function esc(e) { if (e.key === "Escape") fechar(); }
+    fundo.querySelector("button").onclick = fechar;
+    fundo.onclick = function (e) { if (e.target === fundo) fechar(); };
+    document.addEventListener("keydown", esc);
+    document.body.appendChild(fundo); fundo.querySelector("button").focus();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", proximo); else proximo();
+})();
+</script>
+"""
+
+
 def _qr_svg(link):
     """QR code do link do bot, gerado a cada publicação (troca o número, o QR acompanha)."""
     try:
@@ -514,6 +567,9 @@ def render_site(cfg, edit=False, preview=False):
     if videos:
         html = html.replace("</body>", VIDEO_UI + "\n</body>")
 
+    if not edit:  # no editor o popup só atrapalharia
+        html = html.replace("</body>", _avisos_html(site) + "</body>")
+
     if edit:
         ui = (EDITOR_UI
               .replace("__EMBREVE__", "checked" if site.get("emBreve") else "")
@@ -551,7 +607,7 @@ def render_embreve(cfg):
   <h1>{nome}</h1>
   <p>{msg}</p>
   <div class="brand">{sub}</div>
-</body></html>"""
+{_avisos_html(site)}</body></html>"""
 
 
 def _preview_slug(site):
@@ -998,9 +1054,8 @@ def _negado(perm):
 def painel():
     if not _logado():
         return redirect(url_for("login_page"))
-    if not _pode("bot") and _pode("site"):
-        # só site: nem entrega a página do painel (antes piscava a tela do bot)
-        return redirect(url_for("editor"))
+    # a página começa com tudo escondido e só mostra as abas da permissão de cada um
+    # (usuário só-site vê Avisos e o link do editor; nada do bot pisca na tela)
     with open(os.path.join(BASE, "painel.html"), encoding="utf-8") as f:
         return Response(f.read(), mimetype="text/html")
 
@@ -1454,6 +1509,22 @@ def api_conversas():
     return _json({"ok": True, "conversas": [
         {"numero": n, "ts": ts, "total": total, "nome": nome or "", "ultima": ultima or ""}
         for n, ts, total, nome, ultima in linhas]})
+
+
+@app.post("/api/conversas/apagar")
+def api_conversas_apagar():
+    """Apaga a conversa de um número, ou todas (sem número)."""
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o superadmin apaga conversas."}, 403)
+    numero = re.sub(r"\D", "", str((request.get_json(force=True, silent=True) or {}).get("numero") or ""))
+    con = _db()
+    with con:
+        if numero:
+            con.execute("DELETE FROM msgs WHERE numero = ?", (numero,))
+        else:
+            con.execute("DELETE FROM msgs")
+    con.close()
+    return _json({"ok": True})
 
 
 @app.get("/api/conversas/<numero>")

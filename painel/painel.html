@@ -109,6 +109,19 @@
   .b.in { align-self:flex-start; background:var(--ink-3); border-top-left-radius:3px; }
   .b.out { align-self:flex-end; background:rgba(200,154,62,.16); border:1px solid rgba(200,154,62,.3); border-top-right-radius:3px; }
   .vazio { color:var(--cream-dim); padding:18px; }
+  .btn.apagar { color:var(--err); border-color:rgba(239,138,122,.45); padding:7px 12px; font-size:13px; }
+  .btn.apagar:hover { background:rgba(239,138,122,.1); }
+  .chat-lista .apagar { margin:12px 16px; margin-top:auto; }
+  .chat-head .apagar { margin-left:auto; }
+  #conv_lista { flex:1; }
+  .esprow { display:grid; grid-template-columns:170px auto 120px 120px 1fr 40px; gap:12px; align-items:end; padding:14px 0; border-bottom:1px solid var(--line); }
+  .esprow .chk { margin:0 0 12px; }
+  .esprow input[type=time] { width:100%; }
+  .esprow.fechado .e_ini, .esprow.fechado .e_fim { opacity:.35; }
+  .avrow { display:grid; grid-template-columns:1fr 160px 160px 40px; gap:12px; align-items:end; padding:18px 0; border-bottom:1px solid var(--line); }
+  .avrow .a_texto_l { grid-column:1 / -2; }
+  .selo { display:inline-block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border-radius:999px; margin-left:8px; border:1px solid var(--line-strong); color:var(--cream-dim); }
+  .selo.ar { color:var(--ok); border-color:var(--ok); }
 
   #periodos .btn.on { background:rgba(200,154,62,.16); border-color:var(--gold); }
   .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:20px; }
@@ -142,6 +155,8 @@
     .card { padding:16px; }
     .item { grid-template-columns:1fr 1fr 40px; grid-template-areas:"cat cat del" "nome nome nome" "preco tags tags" "desc desc desc"; }
     .faqrow { grid-template-columns:1fr; }
+    .esprow { grid-template-columns:1fr 1fr; } .esprow .e_mot_l { grid-column:1 / -1; }
+    .avrow { grid-template-columns:1fr 1fr; } .avrow .a_tit_l, .avrow .a_texto_l { grid-column:1 / -1; }
     .faqrow .del { justify-self:end; }
     .hrow { grid-template-columns:1fr auto auto auto; gap:8px; }
     .chat { grid-template-columns:1fr; height:calc(100vh - 230px); }
@@ -166,6 +181,7 @@
     <button data-sec="cardapio" class="bot">🍽️ Cardápio</button>
     <button data-sec="drinks" class="bot">🍹 Drinks</button>
     <button data-sec="faq" class="bot">💬 Perguntas frequentes</button>
+    <button data-sec="avisos" class="site">📢 Avisos no site</button>
     <div class="sep"></div>
     <button data-sec="conversas" id="nav-conversas" class="hidden">📨 Conversas</button>
     <button data-sec="custos" id="nav-custos" class="hidden">💰 Custos</button>
@@ -189,6 +205,12 @@
       <h2>Horários</h2>
       <p class="hint">Desmarque o dia em que o restaurante não abre.</p>
       <div class="card" id="horarios"></div>
+      <div class="card">
+        <h3>Datas especiais</h3>
+        <p class="hint">Feriados e dias com horário diferente. O bot avisa quando perguntam (ex: “abre no Natal?”) e mostra as próximas datas junto do horário. Pra avisar no site também, crie um aviso em “Avisos no site”.</p>
+        <div id="especiais"></div>
+        <button class="btn ghost wide" onclick="addEspecial(); marcarAlterado()">+ Adicionar data</button>
+      </div>
     </section>
 
     <section class="sec hidden" id="sec-servicos">
@@ -229,6 +251,15 @@
       </div>
     </section>
 
+    <section class="sec hidden" id="sec-avisos">
+      <h2>Avisos no site</h2>
+      <p class="hint">Um aviso aparece numa janelinha quando alguém abre o site, só entre as datas de início e fim (ex: “Fechados no feriado”, “Horário especial de Natal”). Cada visitante vê o aviso uma vez.</p>
+      <div class="card">
+        <div id="avisos"></div>
+        <button class="btn ghost wide" onclick="addAviso({ inicio: dia(Date.now() / 1000) }); marcarAlterado()">+ Novo aviso</button>
+      </div>
+    </section>
+
     <section class="sec hidden" id="sec-conversas">
       <h2>Conversas</h2>
       <p class="hint">O que os clientes mandam no WhatsApp e o que o bot responde. Só o superadmin vê. Ficam guardadas por 3 dias.</p>
@@ -236,9 +267,11 @@
         <div class="chat-lista">
           <input type="search" placeholder="Buscar nome ou número..." oninput="filtrarConversas(this.value)">
           <div id="conv_lista"></div>
+          <button class="btn ghost apagar" onclick="apagarConversa('')">🗑 Apagar todas</button>
         </div>
         <div class="chat-thread">
-          <div class="chat-head"><button class="btn ghost voltar" onclick="fecharConversa()">←</button><span id="conv_head">Escolha uma conversa</span></div>
+          <div class="chat-head"><button class="btn ghost voltar" onclick="fecharConversa()">←</button><span id="conv_head">Escolha uma conversa</span>
+            <button class="btn ghost apagar hidden" id="conv_apagar" onclick="apagarConversa(CONV_ABERTA)">🗑 Apagar</button></div>
           <div class="msgs" id="conv_msgs"></div>
         </div>
       </div>
@@ -344,7 +377,7 @@ const semLogin = e => String(e).indexOf("sem login") >= 0;
 function mostrar(sec) {
   document.querySelectorAll(".sec").forEach(s => s.classList.toggle("hidden", s.id !== "sec-" + sec));
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.sec === sec));
-  el("bar").classList.toggle("hidden", !PODE_BOT || ["usuarios", "conversas", "custos"].includes(sec));
+  el("bar").classList.toggle("hidden", sec === "avisos" ? !PODE_SITE : !PODE_BOT || ["usuarios", "conversas", "custos", "semperm"].includes(sec));
   if (sec === "conversas") carregarConversas();
   if (sec === "custos") carregarCustos();
   history.replaceState(null, "", "#" + sec);
@@ -400,6 +433,53 @@ function addFaq(q = { p:"", r:"" }) {
   row.querySelector(".del").onclick = () => { row.remove(); marcarAlterado(); };
   el("faq").appendChild(row); ajustar(row.querySelector(".f_r"));
 }
+
+// ---------------- datas especiais (horários) ----------------
+function addEspecial(d = { data:"", abre:false, ini:"", fim:"", motivo:"" }) {
+  const row = document.createElement("div"); row.className = "esprow" + (d.abre ? "" : " fechado");
+  row.innerHTML = `<label class="f">Data<input type="date" class="e_data"></label>
+    <label class="chk"><input type="checkbox" class="e_abre"> Abre</label>
+    <label class="f">Das<input type="time" class="e_ini"></label>
+    <label class="f">Às<input type="time" class="e_fim"></label>
+    <label class="f e_mot_l">Motivo<input class="e_mot" placeholder="ex: Natal"></label>
+    <button class="del" title="Remover data">✕</button>`;
+  row.querySelector(".e_data").value = d.data || ""; row.querySelector(".e_abre").checked = !!d.abre;
+  row.querySelector(".e_ini").value = d.ini || ""; row.querySelector(".e_fim").value = d.fim || "";
+  row.querySelector(".e_mot").value = d.motivo || "";
+  row.querySelector(".e_abre").onchange = e => row.classList.toggle("fechado", !e.target.checked);
+  row.querySelector(".del").onclick = () => { row.remove(); marcarAlterado(); };
+  el("especiais").appendChild(row);
+}
+const coletarEspeciais = () => [...document.querySelectorAll("#especiais .esprow")].map(r => ({
+  data: r.querySelector(".e_data").value, abre: r.querySelector(".e_abre").checked,
+  ini: r.querySelector(".e_ini").value, fim: r.querySelector(".e_fim").value, motivo: r.querySelector(".e_mot").value.trim(),
+})).filter(d => d.data).sort((a, b) => a.data.localeCompare(b.data));
+
+// ---------------- avisos no site ----------------
+function seloAviso(row) {
+  const hoje = dia(Date.now() / 1000), ini = row.querySelector(".a_ini").value, fim = row.querySelector(".a_fim").value;
+  const s = row.querySelector(".selo");
+  const [txt, cls] = fim && fim < hoje ? ["Encerrado", ""] : ini && ini > hoje ? ["Agendado", ""] : ["No ar", "ar"];
+  s.textContent = txt; s.className = "selo " + cls;
+}
+function addAviso(a = {}) {
+  const row = document.createElement("div"); row.className = "avrow";
+  row.dataset.id = a.id || Date.now().toString(36);  // id novo = aviso novo, reaparece pra quem já fechou outro
+  row.innerHTML = `<label class="f a_tit_l">Título <span class="selo"></span><input class="a_tit" placeholder="ex: Fechados no feriado"></label>
+    <label class="f">Início<input type="date" class="a_ini"></label>
+    <label class="f">Fim<input type="date" class="a_fim"></label>
+    <button class="del" title="Remover aviso">✕</button>
+    <label class="f a_texto_l">Mensagem<textarea class="a_texto" rows="2" placeholder="ex: No dia 25/12 não abriremos. Boas festas!"></textarea></label>`;
+  row.querySelector(".a_tit").value = a.titulo || ""; row.querySelector(".a_texto").value = a.texto || "";
+  row.querySelector(".a_ini").value = a.inicio || ""; row.querySelector(".a_fim").value = a.fim || "";
+  row.querySelectorAll("input[type=date]").forEach(i => i.addEventListener("input", () => seloAviso(row)));
+  row.querySelector(".del").onclick = () => { row.remove(); marcarAlterado(); };
+  el("avisos").appendChild(row); seloAviso(row); ajustar(row.querySelector(".a_texto"));
+}
+const coletarAvisos = () => [...document.querySelectorAll("#avisos .avrow")].map(r => ({
+  id: r.dataset.id, titulo: r.querySelector(".a_tit").value.trim(), texto: r.querySelector(".a_texto").value.trim(),
+  inicio: r.querySelector(".a_ini").value, fim: r.querySelector(".a_fim").value,
+})).filter(a => a.titulo || a.texto);
 
 // ---------------- catálogos (cardápio e drinks) ----------------
 let PDFS = {};
@@ -573,7 +653,9 @@ function fillForm(b) {
   PDFS = b.pdfs || {}; CARDAPIO_PDF = b.cardapio_pdf || "";
   Object.keys(CATALOGOS).forEach(t => { preencherItens(t, b[t]); mostrarPdf(t); });
   el("faq").innerHTML = ""; (b.faq || []).forEach(addFaq);
+  el("especiais").innerHTML = ""; (b.datas_especiais || []).forEach(addEspecial);
 }
+function fillSite(s) { el("avisos").innerHTML = ""; (s.avisos || []).forEach(addAviso); }
 function collectBot() {
   const horarios = {};
   DIAS.forEach(([k]) => { horarios[k] = {
@@ -590,12 +672,17 @@ function collectBot() {
     cardapio: coletarItens("cardapio"), drinks: coletarItens("drinks"),
     faq: [...document.querySelectorAll("#faq .faqrow")].map(r => ({ p: r.querySelector(".f_p").value.trim(), r: r.querySelector(".f_r").value.trim() })).filter(q => q.p),
     cardapio_pdf: CARDAPIO_PDF,
+    datas_especiais: coletarEspeciais(),
   };
 }
 async function salvar() {
   const st = el("status"); aviso(st, "Salvando...");
   try {
-    const j = await trata(await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({ bot: collectBot() }) }));
+    // cada um salva só a parte que pode editar (o servidor confere de novo)
+    const corpo = {};
+    if (PODE_BOT) corpo.bot = collectBot();
+    if (PODE_SITE) corpo.site = { avisos: coletarAvisos() };
+    const j = await trata(await fetch(API + "/save", { method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(corpo) }));
     if (!j.ok) return aviso(st, "❌ " + (j.erro || "erro"), "err");
     ALTERADO = false;
     if (j.publicado) aviso(st, "✅ Salvo. O bot usa as mudanças em até 1 minuto.", "ok");
@@ -633,7 +720,7 @@ function filtrarConversas(q) {
   });
 }
 async function abrirConversa(numero, rolar) {
-  CONV_ABERTA = numero; el("chat").classList.add("aberto");
+  CONV_ABERTA = numero; el("chat").classList.add("aberto"); el("conv_apagar").classList.remove("hidden");
   document.querySelectorAll(".conv").forEach(d => d.classList.toggle("on", d.dataset.numero === numero));
   const c = CONVERSAS.find(x => x.numero === numero) || { nome:"", numero };
   el("conv_head").textContent = c.nome ? `${c.nome} · ${fone(numero)}` : fone(numero);
@@ -648,8 +735,17 @@ async function abrirConversa(numero, rolar) {
   });
   if (rolar || noFim) box.scrollTop = box.scrollHeight;  // não puxa pro fim se a pessoa está lendo lá em cima
 }
+async function apagarConversa(numero) {
+  const c = CONVERSAS.find(x => x.numero === numero);
+  if (!confirm(numero ? `Apagar a conversa com ${c && c.nome ? c.nome : fone(numero)}? Não dá pra desfazer.`
+                      : "Apagar TODAS as conversas? Não dá pra desfazer.")) return;
+  const j = await postar("/conversas/apagar", { numero });
+  if (!j.ok) return alert("Erro: " + (j.erro || ""));
+  if (!numero || numero === CONV_ABERTA) { fecharConversa(); el("conv_msgs").innerHTML = ""; el("conv_head").textContent = "Escolha uma conversa"; }
+  carregarConversas();
+}
 function fecharConversa() {  // celular: volta pra lista
-  CONV_ABERTA = ""; el("chat").classList.remove("aberto");
+  CONV_ABERTA = ""; el("chat").classList.remove("aberto"); el("conv_apagar").classList.add("hidden");
   document.querySelectorAll(".conv").forEach(d => d.classList.remove("on"));
 }
 // atualiza sozinho enquanto a aba está aberta
@@ -715,25 +811,23 @@ function desenharCustos() {
 }
 
 // ---------------- usuários ----------------
-let PODE_BOT = true;
+let PODE_BOT = false, PODE_SITE = false;
 async function carregarMe() {
   const me = await trata(await fetch(API + "/me"));
   if (!me.ok) return;
   el("me_user").textContent = me.usuario;
   const pode = p => me.admin || (me.perms || []).includes(p);
-  PODE_BOT = pode("bot");
-  if (!pode("site")) el("nav-site").classList.add("hidden");
+  PODE_BOT = pode("bot"); PODE_SITE = pode("site");
+  // cada aba só aparece pra quem pode; o resto nem é mostrado (e o servidor recusa se tentar)
+  document.querySelectorAll("#nav .bot").forEach(b => b.classList.toggle("hidden", !PODE_BOT));
+  document.querySelectorAll("#nav .site").forEach(b => b.classList.toggle("hidden", !PODE_SITE));
+  el("nav-site").classList.toggle("hidden", !PODE_SITE);
   if (me.admin) {
     ["nav-usuarios", "nav-conversas", "nav-custos"].forEach(id => el(id).classList.remove("hidden")); carregarUsuarios();
   }
-  if (!PODE_BOT) {
-    // só site: vai direto pro editor; nenhuma permissão: avisa
-    if (pode("site") && !me.admin) { location.href = "editor"; return; }
-    document.querySelectorAll("#nav .bot").forEach(b => b.classList.add("hidden"));
-    return mostrar(me.admin ? "usuarios" : "semperm");
-  }
-  const pedida = location.hash.slice(1);
-  mostrar(el("sec-" + pedida) && (pedida !== "usuarios" || me.admin) ? pedida : "restaurante");
+  const pedida = document.querySelector(`#nav button[data-sec="${location.hash.slice(1)}"]:not(.hidden)`);
+  const primeira = document.querySelector("#nav button:not(.hidden)");
+  mostrar(pedida ? pedida.dataset.sec : primeira ? primeira.dataset.sec : "semperm");
 }
 async function carregarUsuarios() {
   const j = await trata(await fetch(API + "/usuarios"));
@@ -805,7 +899,7 @@ async function removerUsuario(usuario) {
   Object.keys(CATALOGOS).forEach(montarCatalogo);
   try {
     const cfg = await (await fetch(API + "/config")).json();
-    fillForm(cfg.bot || {});
+    fillForm(cfg.bot || {}); fillSite(cfg.site || {});
     await carregarMe();
   } catch (e) { if (!semLogin(e)) aviso(el("status"), "Erro ao carregar: " + e, "err"); }
 })();
