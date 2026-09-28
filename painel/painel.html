@@ -120,7 +120,10 @@
   .esprow.fechado .e_ini, .esprow.fechado .e_fim { opacity:.35; }
   .avrow { display:grid; grid-template-columns:1fr 160px 160px 40px; gap:12px; align-items:end; padding:18px 0; border-bottom:1px solid var(--line); }
   .avrow .a_texto_l, .avrow .a_bot_l { grid-column:1 / -2; }
-  .avrow .a_bot_l { margin:0; }
+  .avrow .a_bot_l { margin:0; gap:10px; }
+  .avrow .a_bot_l .chk { margin:0; }
+  select { background:var(--ink); color:var(--cream); border:1px solid var(--line-strong); border-radius:9px; padding:9px 12px; font:14px var(--sans); cursor:pointer; }
+  select:disabled { opacity:.4; cursor:default; }
   .selo { display:inline-block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border-radius:999px; margin-left:8px; border:1px solid var(--line-strong); color:var(--cream-dim); }
   .selo.ar { color:var(--ok); border-color:var(--ok); }
 
@@ -471,10 +474,14 @@ function addAviso(a = {}) {
     <label class="f">Fim<input type="date" class="a_fim"></label>
     <button class="del" title="Remover aviso">✕</button>
     <label class="f a_texto_l">Mensagem<textarea class="a_texto" rows="2" placeholder="ex: No dia 25/12 não abriremos. Boas festas!"></textarea></label>
-    <label class="chk a_bot_l"><input type="checkbox" class="a_bot"> Bot também avisa (no início do atendimento e quando perguntarem)</label>`;
+    <div class="row a_bot_l"><label class="chk"><input type="checkbox" class="a_bot"> Bot também avisa, na mensagem de boas-vindas e quando perguntarem:</label>
+      <select class="a_pos"><option value="topo">em cima das opções</option><option value="fim">embaixo das opções</option></select></div>`;
   row.querySelector(".a_tit").value = a.titulo || ""; row.querySelector(".a_texto").value = a.texto || "";
   row.querySelector(".a_ini").value = a.inicio || ""; row.querySelector(".a_fim").value = a.fim || "";
   row.querySelector(".a_bot").checked = a.bot !== false;
+  row.querySelector(".a_pos").value = a.posicao === "fim" ? "fim" : "topo";
+  const pos = () => row.querySelector(".a_pos").disabled = !row.querySelector(".a_bot").checked;
+  row.querySelector(".a_bot").addEventListener("change", pos); pos();
   row.querySelectorAll("input[type=date]").forEach(i => i.addEventListener("input", () => seloAviso(row)));
   row.querySelector(".del").onclick = () => { row.remove(); marcarAlterado(); };
   el("avisos").appendChild(row); seloAviso(row); ajustar(row.querySelector(".a_texto"));
@@ -482,6 +489,7 @@ function addAviso(a = {}) {
 const coletarAvisos = () => [...document.querySelectorAll("#avisos .avrow")].map(r => ({
   id: r.dataset.id, titulo: r.querySelector(".a_tit").value.trim(), texto: r.querySelector(".a_texto").value.trim(),
   inicio: r.querySelector(".a_ini").value, fim: r.querySelector(".a_fim").value, bot: r.querySelector(".a_bot").checked,
+  posicao: r.querySelector(".a_pos").value,
 })).filter(a => a.titulo || a.texto);
 
 // ---------------- catálogos (cardápio e drinks) ----------------
