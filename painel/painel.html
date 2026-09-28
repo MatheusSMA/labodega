@@ -119,7 +119,9 @@
   .esprow input[type=time] { width:100%; }
   .esprow.fechado .e_ini, .esprow.fechado .e_fim { opacity:.35; }
   .avrow { display:grid; grid-template-columns:1fr 160px 160px 40px; gap:12px; align-items:end; padding:18px 0; border-bottom:1px solid var(--line); }
-  .avrow .a_texto_l, .avrow .a_bot_l { grid-column:1 / -2; }
+  .avrow .a_texto_l, .avrow .a_bot_l, .avrow .a_img_l { grid-column:1 / -2; }
+  .a_prev { width:84px; height:84px; object-fit:cover; border-radius:10px; border:1px solid var(--line-strong); }
+  .a_st { font-size:13px; }
   .avrow .a_bot_l { margin:0; gap:10px; }
   .avrow .a_bot_l .chk { margin:0; }
   select { background:var(--ink); color:var(--cream); border:1px solid var(--line-strong); border-radius:9px; padding:9px 12px; font:14px var(--sans); cursor:pointer; }
@@ -160,7 +162,7 @@
     .item { grid-template-columns:1fr 1fr 40px; grid-template-areas:"cat cat del" "nome nome nome" "preco tags tags" "desc desc desc"; }
     .faqrow { grid-template-columns:1fr; }
     .esprow { grid-template-columns:1fr 1fr; } .esprow .e_mot_l { grid-column:1 / -1; }
-    .avrow { grid-template-columns:1fr 1fr; } .avrow .a_tit_l, .avrow .a_texto_l, .avrow .a_bot_l { grid-column:1 / -1; }
+    .avrow { grid-template-columns:1fr 1fr; } .avrow .a_tit_l, .avrow .a_texto_l, .avrow .a_bot_l, .avrow .a_img_l { grid-column:1 / -1; }
     .faqrow .del { justify-self:end; }
     .hrow { grid-template-columns:1fr auto auto auto; gap:8px; }
     .chat { grid-template-columns:1fr; height:calc(100vh - 230px); }
@@ -474,11 +476,17 @@ function addAviso(a = {}) {
     <label class="f">Fim<input type="date" class="a_fim"></label>
     <button class="del" title="Remover aviso">✕</button>
     <label class="f a_texto_l">Mensagem<textarea class="a_texto" rows="2" placeholder="ex: No dia 25/12 não abriremos. Boas festas!"></textarea></label>
+    <div class="f a_img_l">Imagem no site (opcional)
+      <div class="row" style="margin-top:6px"><img class="a_prev hidden" alt=""><input type="file" accept="image/*" class="a_arq">
+        <button type="button" class="btn ghost apagar a_tira hidden">Tirar imagem</button><span class="a_st"></span></div></div>
     <div class="row a_bot_l"><label class="chk"><input type="checkbox" class="a_bot"> Bot também avisa, na mensagem de boas-vindas e quando perguntarem:</label>
       <select class="a_pos"><option value="topo">em cima das opções</option><option value="fim">embaixo das opções</option></select></div>`;
   row.querySelector(".a_tit").value = a.titulo || ""; row.querySelector(".a_texto").value = a.texto || "";
   row.querySelector(".a_ini").value = a.inicio || ""; row.querySelector(".a_fim").value = a.fim || "";
   row.querySelector(".a_bot").checked = a.bot !== false;
+  mostrarImagemAviso(row, a.imagem || "");
+  row.querySelector(".a_arq").onchange = () => enviarImagemAviso(row);
+  row.querySelector(".a_tira").onclick = () => { mostrarImagemAviso(row, ""); row.querySelector(".a_arq").value = ""; marcarAlterado(); };
   row.querySelector(".a_pos").value = a.posicao === "fim" ? "fim" : "topo";
   const pos = () => row.querySelector(".a_pos").disabled = !row.querySelector(".a_bot").checked;
   row.querySelector(".a_bot").addEventListener("change", pos); pos();
@@ -486,11 +494,32 @@ function addAviso(a = {}) {
   row.querySelector(".del").onclick = () => { row.remove(); marcarAlterado(); };
   el("avisos").appendChild(row); seloAviso(row); ajustar(row.querySelector(".a_texto"));
 }
+function mostrarImagemAviso(row, path) {
+  row.dataset.imagem = path;
+  const img = row.querySelector(".a_prev"); img.src = path || ""; img.classList.toggle("hidden", !path);
+  row.querySelector(".a_tira").classList.toggle("hidden", !path);
+}
+// foto de celular chega com vários MB: reduz pra no máximo 1200px em JPEG antes de subir
+async function enviarImagemAviso(row) {
+  const st = row.querySelector(".a_st"), f = row.querySelector(".a_arq").files[0];
+  if (!f) return;
+  aviso(st, "Enviando...");
+  try {
+    const bmp = await createImageBitmap(f), k = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = bmp.width * k; c.height = bmp.height * k;
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(ok => c.toBlob(ok, "image/jpeg", 0.85));
+    const fd = new FormData(); fd.append("arquivo", blob, "aviso.jpg"); fd.append("id", row.dataset.id);
+    const j = await trata(await fetch(API + "/aviso-imagem", { method: "POST", body: fd }));
+    if (!j.ok) return aviso(st, "❌ " + (j.erro || "erro"), "err");
+    mostrarImagemAviso(row, j.path); marcarAlterado(); aviso(st, "✅ Clique em Salvar", "ok");
+  } catch (e) { if (!semLogin(e)) aviso(st, "❌ não consegui abrir a imagem", "err"); }
+}
 const coletarAvisos = () => [...document.querySelectorAll("#avisos .avrow")].map(r => ({
   id: r.dataset.id, titulo: r.querySelector(".a_tit").value.trim(), texto: r.querySelector(".a_texto").value.trim(),
   inicio: r.querySelector(".a_ini").value, fim: r.querySelector(".a_fim").value, bot: r.querySelector(".a_bot").checked,
-  posicao: r.querySelector(".a_pos").value,
-})).filter(a => a.titulo || a.texto);
+  posicao: r.querySelector(".a_pos").value, imagem: r.dataset.imagem || "",
+})).filter(a => a.titulo || a.texto || a.imagem);
 
 // ---------------- catálogos (cardápio e drinks) ----------------
 let PDFS = {};

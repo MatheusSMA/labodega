@@ -415,14 +415,16 @@ def _avisos_html(site):
     """
     ontem = time.strftime("%Y-%m-%d", time.localtime(time.time() - 86400))  # folga de fuso
     avisos = [{"id": str(a.get("id") or ""), "titulo": a.get("titulo") or "", "texto": a.get("texto") or "",
-               "inicio": a.get("inicio") or "0000-00-00", "fim": a.get("fim") or "9999-12-31"}
-              for a in site.get("avisos") or [] if (a.get("titulo") or a.get("texto")) and (a.get("fim") or "9999") >= ontem]
+               "imagem": a.get("imagem") or "", "inicio": a.get("inicio") or "0000-00-00", "fim": a.get("fim") or "9999-12-31"}
+              for a in site.get("avisos") or []
+              if (a.get("titulo") or a.get("texto") or a.get("imagem")) and (a.get("fim") or "9999") >= ontem]
     if not avisos:
         return ""
     dados = json.dumps(avisos, ensure_ascii=False).replace("</", "<\\/")
     return """<style>
 .aviso-fundo{position:fixed;inset:0;z-index:9999;background:rgba(10,9,8,.74);display:flex;align-items:center;justify-content:center;padding:20px}
 .aviso-box{max-width:440px;width:100%;background:#23201c;color:#e8e1d0;border:1px solid rgba(200,154,62,.45);border-radius:16px;padding:32px 26px 26px;text-align:center;font-family:"Montserrat",system-ui,sans-serif;box-shadow:0 30px 80px -20px rgba(0,0,0,.8)}
+.aviso-box img{display:block;width:100%;max-height:52vh;object-fit:contain;border-radius:10px;margin:-8px 0 18px}
 .aviso-box small{display:block;font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:#c89a3e;font-weight:600;margin-bottom:12px}
 .aviso-box h3{font-family:"Playfair Display",Georgia,serif;font-size:1.6rem;line-height:1.2;margin-bottom:12px;color:#e2bd62}
 .aviso-box p{color:#ada592;line-height:1.6;white-space:pre-line;margin-bottom:22px}
@@ -440,6 +442,11 @@ def _avisos_html(site):
     fundo.innerHTML = '<div class="aviso-box" role="dialog" aria-modal="true"><small>Aviso</small><h3></h3><p></p><button type="button">Entendi</button></div>';
     fundo.querySelector("h3").textContent = a.titulo; fundo.querySelector("p").textContent = a.texto;
     if (!a.titulo) fundo.querySelector("h3").remove();
+    if (!a.texto) fundo.querySelector("p").remove();
+    if (a.imagem) {
+      var img = document.createElement("img"); img.src = a.imagem; img.alt = a.titulo || "Aviso";
+      fundo.querySelector(".aviso-box").prepend(img);
+    }
     function fechar() {
       try { localStorage.setItem("aviso-" + a.id, "1"); } catch (e) {}
       fundo.remove(); document.removeEventListener("keydown", esc); proximo();
@@ -1324,6 +1331,8 @@ def api_save():
     for k, v in body.items():
         cfg[k] = {**cfg.get(k, {}), **v} if isinstance(v, dict) else v
     save_cfg(cfg)
+    if "avisos" in (body.get("site") or {}):
+        _limpar_imagens_avisos(cfg)
     ok, msg = publish_site(cfg)
     return _json({"ok": True, "publicado": ok, "msg": msg})
 
@@ -1573,6 +1582,38 @@ def api_custos():
     resp = {"ok": True, "moeda": dados.get("currency", ""), "pontos": pontos}
     _custos_cache.update(t=agora, resp=resp)
     return _json(resp)
+
+
+# ---------------- imagem do aviso (popup do site) ----------------
+@app.post("/api/aviso-imagem")
+def api_aviso_imagem():
+    """Guarda a imagem de um aviso (o navegador já manda em JPEG reduzido)."""
+    if (r := _negado("site")):
+        return r
+    f = request.files.get("arquivo")
+    aid = re.sub(r"[^a-z0-9]", "", (request.form.get("id") or "").lower())[:20]
+    dados = f.read() if f else b""
+    if not aid or not dados.startswith(b"\xff\xd8"):
+        return _json({"ok": False, "erro": "Envie uma imagem."}, 400)
+    if len(dados) > 3_000_000:
+        return _json({"ok": False, "erro": "Imagem grande demais."}, 400)
+    img_dir = os.path.join(PUBLIC_HTML, "img")
+    os.makedirs(img_dir, exist_ok=True)
+    fname = f"aviso-{aid}-{int(time.time())}.jpg"
+    with open(os.path.join(img_dir, fname), "wb") as out:
+        out.write(dados)
+    return _json({"ok": True, "path": "/img/" + fname})
+
+
+def _limpar_imagens_avisos(cfg):
+    """Apaga imagem de aviso que nenhum aviso salvo usa mais (trocada, removida ou não salva)."""
+    usadas = {os.path.basename(a.get("imagem") or "") for a in (cfg.get("site") or {}).get("avisos") or []}
+    for arq in glob.glob(os.path.join(PUBLIC_HTML, "img", "aviso-*.jpg")):
+        if os.path.basename(arq) not in usadas:
+            try:
+                os.remove(arq)
+            except OSError:
+                pass
 
 
 CATALOGOS = {"cardapio", "drinks"}
