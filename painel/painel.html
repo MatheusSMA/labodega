@@ -129,6 +129,12 @@
   .selo { display:inline-block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:3px 9px; border-radius:999px; margin-left:8px; border:1px solid var(--line-strong); color:var(--cream-dim); }
   .selo.ar { color:var(--ok); border-color:var(--ok); }
 
+  .iamod { display:grid; grid-template-columns:170px repeat(3, 1fr); gap:10px 18px; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); }
+  .iamod b { font-size:14px; } .iamod b small { display:block; color:var(--cream-dim); font-weight:500; font-size:12px; }
+  .iamod .rot { font-size:12px; color:var(--cream-dim); display:flex; justify-content:space-between; margin-bottom:5px; }
+  .iamod .rot span:last-child { color:var(--cream); font-variant-numeric:tabular-nums; }
+  .meter span.warn { background:var(--warn); } .meter span.err { background:var(--err); }
+  .selo.warn { color:var(--warn); border-color:var(--warn); } .selo.err { color:var(--err); border-color:var(--err); }
   #periodos .btn.on { background:rgba(200,154,62,.16); border-color:var(--gold); }
   .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; margin-bottom:20px; }
   .tile { background:var(--ink-2); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
@@ -165,6 +171,7 @@
     .avrow { grid-template-columns:1fr 1fr; } .avrow .a_tit_l, .avrow .a_texto_l, .avrow .a_bot_l, .avrow .a_img_l { grid-column:1 / -1; }
     .faqrow .del { justify-self:end; }
     .hrow { grid-template-columns:1fr auto auto auto; gap:8px; }
+    .iamod { grid-template-columns:1fr; }
     .chat { grid-template-columns:1fr; height:calc(100vh - 230px); }
     .chat .chat-thread { display:none; } .chat.aberto .chat-thread { display:flex; } .chat.aberto .chat-lista { display:none; }
     .chat-head .voltar { display:inline-block; }
@@ -284,7 +291,17 @@
     </section>
 
     <section class="sec hidden" id="sec-custos">
-      <h2>Custos do WhatsApp</h2>
+      <h2>Custos e limites</h2>
+      <div class="card">
+        <div class="cardhead"><h3>IA do bot (Groq, plano grátis)</h3><span id="ia_selo" class="selo"></span></div>
+        <p class="hint">Cada pergunta livre que o cliente faz passa pela IA. O plano grátis tem limite por dia e por minuto; se o modelo principal estourar, o reserva responde no lugar. Contam só os tokens que não vieram do cache.</p>
+        <div class="st" id="ia_st"></div>
+        <div id="ia_modelos"></div>
+        <h3 style="margin-top:18px">Tokens por dia · o topo do gráfico é o limite diário</h3>
+        <div class="grafico"><div class="eixo-y"><span id="ia_ymax"></span><span>0</span></div><div class="barras" id="ia_barras"></div></div>
+        <div class="eixo-x"><span id="ia_xini"></span><span id="ia_xfim"></span></div>
+      </div>
+      <h3 style="margin:26px 0 6px;font:600 20px var(--serif)">WhatsApp (Meta)</h3>
       <p class="hint">Números da Meta: quantas mensagens o bot mandou e quanto custaram. Atualiza a cada 10 minutos e pode atrasar algumas horas. Cartão e faturas ficam no <a href="https://business.facebook.com/billing_hub/accounts?business_id=1019073004511953" target="_blank" rel="noopener">Billing Hub</a>.</p>
       <div class="row" style="margin-bottom:18px" id="periodos">
         <button class="btn ghost" data-dias="7">7 dias</button>
@@ -799,7 +816,57 @@ const dia = ts => new Date(ts * 1000).toLocaleDateString("sv");  // AAAA-MM-DD n
 const inteiro = n => n.toLocaleString("pt-BR");
 const dinheiro = v => (CUSTOS.moeda ? CUSTOS.moeda + " " : "") + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 document.querySelectorAll("#periodos button").forEach(b => b.onclick = () => { PERIODO = +b.dataset.dias; desenharCustos(); });
+// ---- IA do bot: uso de hoje contra os limites do plano grátis da Groq ----
+const NOMES_IA = { "openai/gpt-oss-120b": ["Principal", "gpt-oss-120b"], "openai/gpt-oss-20b": ["Reserva", "gpt-oss-20b"] };
+function medidor(rotulo, valor, limite) {
+  const p = limite ? valor / limite : 0, cls = p >= .8 ? "err" : p >= .5 ? "warn" : "";
+  return `<div><div class="rot"><span>${rotulo}</span><span>${inteiro(valor)} / ${inteiro(limite)}</span></div>
+    <div class="meter"><span class="${cls}" style="width:${Math.min(100, p * 100)}%"></span></div></div>`;
+}
+async function carregarIA() {
+  const j = await trata(await fetch(API + "/ia/uso"));
+  if (!j.ok) return aviso(el("ia_st"), "❌ " + (j.erro || "erro"), "err");
+  const L = j.limites, modelos = Object.entries(j.hoje);
+  // pior uso de hoje, olhando os três limites de cada modelo
+  let pior = 0, limites = 0;
+  modelos.forEach(([, m]) => {
+    pior = Math.max(pior, m.perguntas / L.perguntas_dia, m.contados / L.tokens_dia, m.pico_min / L.tokens_min);
+    limites += m.limites;
+  });
+  const [txt, cls] = pior >= .8 ? ["⛔ Perto do limite", "err"] : pior >= .5 ? ["⚠ Atenção", "warn"] : ["✓ Tranquilo", "ar"];
+  el("ia_selo").textContent = txt; el("ia_selo").className = "selo " + cls;
+  aviso(el("ia_st"), !modelos.length ? "Nenhuma pergunta pra IA hoje ainda."
+    : limites ? `Hoje o limite estourou ${limites} vez(es); o modelo reserva respondeu no lugar.` : "",
+    limites ? "warn" : "dim");
+  el("ia_modelos").innerHTML = modelos.map(([id, m]) => {
+    const [papel, curto] = NOMES_IA[id] || ["Modelo", id];
+    const cache = m.prompt ? Math.round(m.cache / m.prompt * 100) : 0;
+    return `<div class="iamod"><b>${papel}<small>${curto} · ${cache}% veio do cache</small></b>
+      ${medidor("Perguntas hoje", m.perguntas, L.perguntas_dia)}
+      ${medidor("Tokens hoje", m.contados, L.tokens_dia)}
+      ${medidor("Pico em 1 minuto", m.pico_min, L.tokens_min)}</div>`;
+  }).join("");
+  // últimos 30 dias, com o limite diário como teto do gráfico
+  const hoje = new Date(); hoje.setHours(12, 0, 0, 0);
+  const dias = [...Array(30)].map((_, i) => dia(hoje / 1000 - (29 - i) * 86400));
+  const porDia = Object.fromEntries(j.dias.map(d => [d.dia, d]));
+  const teto = Math.max(L.tokens_dia, ...j.dias.map(d => d.contados));
+  el("ia_ymax").textContent = inteiro(teto);
+  el("ia_xini").textContent = dias[0].slice(8, 10) + "/" + dias[0].slice(5, 7);
+  el("ia_xfim").textContent = dias[29].slice(8, 10) + "/" + dias[29].slice(5, 7);
+  el("ia_barras").innerHTML = "";
+  dias.forEach(d => {
+    const v = porDia[d] || { perguntas: 0, contados: 0, limites: 0 };
+    const b = document.createElement("div"); b.className = "barra";
+    b.style.height = (v.contados / teto * 100) + "%";
+    b.title = `${d.slice(8, 10)}/${d.slice(5, 7)}: ${inteiro(v.perguntas)} perguntas · ${inteiro(v.contados)} tokens` +
+      (v.limites ? ` · limite estourou ${v.limites}x` : "");
+    el("ia_barras").appendChild(b);
+  });
+}
+
 async function carregarCustos() {
+  carregarIA();
   if (!CUSTOS) aviso(el("custos_st"), "Buscando na Meta...");
   const j = await trata(await fetch(API + "/custos"));
   if (!j.ok) return aviso(el("custos_st"), "❌ " + (j.erro || "erro"), "err");

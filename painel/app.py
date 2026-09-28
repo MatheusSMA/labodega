@@ -1550,6 +1550,72 @@ def api_conversa(numero):
     return _json({"ok": True, "msgs": [{"ts": ts, "direcao": d, "texto": t} for ts, d, t in reversed(linhas)]})
 
 
+# ---------------- uso da IA do bot (Groq), também na aba Custos ----------------
+# Plano grátis da Groq, POR MODELO: 1.000 perguntas/dia, 8 mil tokens/min, 200 mil tokens/dia.
+# Token que veio do cache da Groq não conta no limite, por isso "contados" desconta o cache.
+IA_LIMITES = {"perguntas_dia": 1000, "tokens_dia": 200_000, "tokens_min": 8000}
+
+
+def _db_ia():
+    con = _db()
+    con.execute("CREATE TABLE IF NOT EXISTS ia_uso (ts REAL, modelo TEXT, status TEXT, prompt INTEGER,"
+                " cache INTEGER, resposta INTEGER, restam_dia INTEGER)")
+    with con:
+        con.execute("DELETE FROM ia_uso WHERE ts < ?", (time.time() - 90 * 86400,))
+    return con
+
+
+@app.post("/api/ia/registrar")
+def api_ia_registrar():
+    """O bot manda o uso de cada pergunta que foi pra IA (ok) ou que bateu no limite."""
+    chave = request.headers.get("x-conversas-key", "")
+    if not CONVERSAS_KEY or not secrets.compare_digest(chave, CONVERSAS_KEY):
+        return _json({"ok": False, "erro": "chave inválida"}, 401)
+    b = request.get_json(force=True, silent=True) or {}
+    inteiro = lambda v: int(v) if str(v or "").isdigit() else None  # noqa: E731
+    con = _db_ia()
+    with con:
+        con.execute("INSERT INTO ia_uso VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (time.time(), str(b.get("modelo") or "")[:60], str(b.get("status") or "ok")[:10],
+                     inteiro(b.get("prompt")) or 0, inteiro(b.get("cache")) or 0,
+                     inteiro(b.get("resposta")) or 0, inteiro(b.get("restam_dia"))))
+    con.close()
+    return _json({"ok": True})
+
+
+@app.get("/api/ia/uso")
+def api_ia_uso():
+    """Resumo pro painel: hoje por modelo (contra os limites), pico por minuto e os últimos 30 dias."""
+    if not _admin_ok():
+        return _json({"ok": False, "erro": "Só o superadmin vê os custos."}, 403)
+    con = _db_ia()
+    linhas = con.execute("SELECT ts, modelo, status, prompt, cache, resposta, restam_dia FROM ia_uso"
+                         " WHERE ts >= ? ORDER BY ts", (time.time() - 30 * 86400,)).fetchall()
+    con.close()
+    hoje = time.strftime("%Y-%m-%d")
+    modelos, dias, minutos = {}, {}, {}
+    for ts, modelo, status, prompt, cache, resposta, restam in linhas:
+        dia = time.strftime("%Y-%m-%d", time.localtime(ts))
+        contados = max(0, prompt - cache) + resposta
+        d = dias.setdefault(dia, {"perguntas": 0, "contados": 0, "cache": 0, "limites": 0})
+        d["perguntas"] += status == "ok"; d["contados"] += contados; d["cache"] += cache
+        d["limites"] += status == "limite"
+        if dia != hoje:
+            continue
+        m = modelos.setdefault(modelo, {"perguntas": 0, "contados": 0, "prompt": 0, "cache": 0,
+                                        "limites": 0, "restam_dia": None})
+        m["perguntas"] += status == "ok"; m["contados"] += contados; m["prompt"] += prompt
+        m["cache"] += cache; m["limites"] += status == "limite"
+        if restam is not None:
+            m["restam_dia"] = restam
+        chave_min = (modelo, int(ts // 60))
+        minutos[chave_min] = minutos.get(chave_min, 0) + contados
+    for modelo, m in modelos.items():
+        m["pico_min"] = max([v for (mod, _), v in minutos.items() if mod == modelo] or [0])
+    return _json({"ok": True, "limites": IA_LIMITES, "hoje": modelos,
+                  "dias": [{"dia": k, **v} for k, v in sorted(dias.items())]})
+
+
 # ---------------- custos do WhatsApp (aba Custos, só superadmin) ----------------
 _custos_cache = {"t": 0.0, "resp": None}
 
