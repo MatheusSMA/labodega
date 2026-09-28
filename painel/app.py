@@ -1301,7 +1301,10 @@ def api_config():
 
 @app.get("/api/config/bot")
 def api_config_bot():
-    return _json(load_cfg().get("bot", DEFAULT_BOT))
+    cfg = load_cfg()
+    # avisos moram no site, mas o bot também fala deles (os marcados "Bot também avisa")
+    avisos = [a for a in (cfg.get("site") or {}).get("avisos") or [] if a.get("bot", True)]
+    return _json({**cfg.get("bot", DEFAULT_BOT), "avisos": avisos})
 
 
 @app.post("/api/save")
