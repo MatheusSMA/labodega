@@ -323,7 +323,7 @@
       <h3 style="margin:26px 0 12px;font:600 20px var(--serif)">IA do bot</h3>
       <div class="card">
         <div class="cardhead"><h3>Uso de hoje (Groq, plano grátis)</h3><span id="ia_selo" class="selo"></span></div>
-        <p class="hint">Cada pergunta livre que o cliente faz passa pela IA. O plano grátis tem limite por dia e por minuto; se o modelo principal estourar, o reserva responde no lugar. Contam só os tokens que não vieram do cache.</p>
+        <p class="hint">Cada pergunta livre que o cliente faz passa pela IA (cardápio, "obrigado" e números do menu não). O plano grátis tem limite por dia e por minuto; se o modelo principal estourar, o reserva responde no lugar. Atualiza sozinho a cada 30 segundos.</p>
         <div class="st" id="ia_st"></div>
         <div id="ia_modelos"></div>
         <h3 style="margin-top:18px">Tokens por dia · o topo do gráfico é o limite diário</h3>
@@ -828,10 +828,10 @@ async function carregarIA() {
   const j = await trata(await fetch(API + "/ia/uso"));
   if (!j.ok) return aviso(el("ia_st"), "❌ " + (j.erro || "erro"), "err");
   const L = j.limites, modelos = Object.entries(j.hoje);
-  // pior uso de hoje, olhando os três limites de cada modelo
+  // situação de AGORA: o dia até aqui e o último minuto (o pico do dia é só informação)
   let pior = 0, limites = 0;
   modelos.forEach(([, m]) => {
-    pior = Math.max(pior, m.perguntas / L.perguntas_dia, m.contados / L.tokens_dia, m.pico_min / L.tokens_min);
+    pior = Math.max(pior, m.perguntas / L.perguntas_dia, m.contados / L.tokens_dia, m.ultimo_min / L.tokens_min);
     limites += m.limites;
   });
   const [txt, cls] = pior >= .8 ? ["⛔ Perto do limite", "err"] : pior >= .5 ? ["⚠ Atenção", "warn"] : ["✓ Tranquilo", "ar"];
@@ -841,11 +841,11 @@ async function carregarIA() {
     limites ? "warn" : "dim");
   el("ia_modelos").innerHTML = modelos.map(([id, m]) => {
     const [papel, curto] = NOMES_IA[id] || ["Modelo", id];
-    const cache = m.prompt ? Math.round(m.cache / m.prompt * 100) : 0;
-    return `<div class="iamod"><b>${papel}<small>${curto} · ${cache}% veio do cache</small></b>
+    const pico = m.pico_min ? ` · pico de hoje: ${inteiro(m.pico_min)} tokens num minuto` : "";
+    return `<div class="iamod"><b>${papel}<small>${curto}${pico}</small></b>
       ${medidor("Perguntas hoje", m.perguntas, L.perguntas_dia)}
       ${medidor("Tokens hoje", m.contados, L.tokens_dia)}
-      ${medidor("Pico em 1 minuto", m.pico_min, L.tokens_min)}</div>`;
+      ${medidor("Último minuto", m.ultimo_min, L.tokens_min)}</div>`;
   }).join("");
   // últimos 30 dias, com o limite diário como teto do gráfico
   const hoje = new Date(); hoje.setHours(12, 0, 0, 0);
@@ -865,6 +865,9 @@ async function carregarIA() {
     el("ia_barras").appendChild(b);
   });
 }
+
+// o uso da IA muda a cada pergunta: atualiza sozinho enquanto a aba Custos está aberta
+setInterval(() => { if (!el("sec-custos").classList.contains("hidden")) carregarIA(); }, 30000);
 
 async function carregarCustos() {
   carregarIA();

@@ -1610,9 +1610,11 @@ def api_ia_uso():
         if dia != hoje:
             continue
         m = modelos.setdefault(modelo, {"perguntas": 0, "contados": 0, "prompt": 0, "cache": 0,
-                                        "limites": 0, "restam_dia": None})
+                                        "limites": 0, "restam_dia": None, "ultimo_min": 0})
         m["perguntas"] += status == "ok"; m["contados"] += contados; m["prompt"] += prompt
         m["cache"] += cache; m["limites"] += status == "limite"
+        if time.time() - ts < 60:  # o limite de 8 mil/min vale pros últimos 60 segundos
+            m["ultimo_min"] += contados
         if restam is not None:
             m["restam_dia"] = restam
         chave_min = (modelo, int(ts // 60))
