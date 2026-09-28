@@ -85,6 +85,8 @@
     box-shadow:0 6px 22px -10px rgba(200,154,62,.7);
   }
   .tg-btn:hover{background:var(--gold-soft);transform:translateY(-2px)}
+  /* o botão mora dentro de .nav-links, cuja regra de link (mais específica) clareava o texto */
+  .nav-links a.tg-btn,.nav-links a.tg-btn:hover{color:var(--ink)}
   .tg-btn svg{width:16px;height:16px;fill:var(--ink)}
   .burger{display:none;background:none;border:0;cursor:pointer;flex-direction:column;gap:5px;padding:6px}
   .burger span{width:24px;height:2px;background:var(--cream);transition:.3s}
